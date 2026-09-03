@@ -1,0 +1,151 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String       @id @default(uuid())
+  name             String
+  email            String       @unique
+  passwordHash     String
+  role             String       @default("ORGANIZER")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  events           Event[]      @relation("OrganizerEvents")
+  staffAssignments EventStaff[]
+  checkIns         CheckIn[]    @relation("StaffCheckIns")
+  auditLogs        AuditLog[]   @relation("UserAuditLogs")
+
+  @@index([email])
+}
+
+model Event {
+  id           String        @id @default(uuid())
+  organizerId  String
+  name         String
+  description  String?
+  venue        String
+  address      String
+  startDateTime DateTime
+  endDateTime   DateTime
+  capacity     Int           @default(100)
+  status       String        @default("UPCOMING")
+  rsvpDeadline DateTime?
+  bannerUrl    String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  organizer    User          @relation("OrganizerEvents", fields: [organizerId], references: [id], onDelete: Cascade)
+  guests       Guest[]
+  invitations  Invitation[]
+  staff        EventStaff[]
+  checkIns     CheckIn[]
+  auditLogs    AuditLog[]
+
+  @@index([organizerId])
+  @@index([startDateTime])
+  @@index([status])
+}
+
+model Guest {
+  id         String        @id @default(uuid())
+  eventId    String
+  name       String
+  email      String
+  phone      String?
+  category   String        @default("REGULAR")
+  plusOne    Int           @default(0)
+  notes      String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  event      Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  invitation Invitation?
+  checkIn    CheckIn?
+
+  @@index([eventId])
+  @@index([email])
+}
+
+model Invitation {
+  id                   String           @id @default(uuid())
+  guestId              String           @unique
+  eventId              String
+  token                String           @unique
+  tokenHash            String           @unique
+  verificationCodeHash String
+  status               String           @default("PENDING")
+  rsvpStatus           String           @default("PENDING")
+  rsvpAt               DateTime?
+  expiresAt            DateTime
+  revokedAt            DateTime?
+  viewedAt             DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  guest                Guest            @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  event                Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  checkIn              CheckIn?
+
+  @@index([eventId])
+  @@index([guestId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model EventStaff {
+  id         String   @id @default(uuid())
+  eventId    String
+  userId     String
+  assignedAt DateTime @default(now())
+
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+}
+
+model CheckIn {
+  id           String     @id @default(uuid())
+  eventId      String
+  guestId      String     @unique
+  invitationId String     @unique
+  checkedInBy  String
+  checkedInAt  DateTime   @default(now())
+
+  event        Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guest        Guest      @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  staffUser    User       @relation("StaffCheckIns", fields: [checkedInBy], references: [id], onDelete: Cascade)
+
+  @@index([eventId, checkedInAt])
+  @@index([checkedInBy])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  eventId    String?
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  actor      User?    @relation("UserAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
+  event      Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+}
