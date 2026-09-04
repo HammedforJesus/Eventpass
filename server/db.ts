@@ -1,9 +1,41 @@
 import { PrismaClient } from '@prisma/client';
+import fs from 'fs';
+import path from 'path';
 
-// Ensure DATABASE_URL is set; default to SQLite dev.db if unset or previously set to MySQL
-if (!process.env.DATABASE_URL || process.env.DATABASE_URL.startsWith('mysql://')) {
-  process.env.DATABASE_URL = 'file:./dev.db';
+// Resolve database URL, ensuring that serverless platforms (e.g. Vercel) have a writable SQLite file in /tmp
+function resolveDatabaseUrl(): string {
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  
+  if (isServerless) {
+    const tmpPath = path.join('/tmp', 'dev.db');
+    if (!fs.existsSync(tmpPath)) {
+      const candidates = [
+        path.join(process.cwd(), 'prisma', 'dev.db'),
+        path.join(process.cwd(), 'dev.db'),
+      ];
+      for (const src of candidates) {
+        if (fs.existsSync(src)) {
+          try {
+            fs.copyFileSync(src, tmpPath);
+            console.log(`[DB] Copied SQLite database to writable path: ${tmpPath}`);
+            break;
+          } catch (copyErr) {
+            console.warn('[DB] Could not copy SQLite database to /tmp:', copyErr);
+          }
+        }
+      }
+    }
+    return `file:${tmpPath}`;
+  }
+
+  if (!process.env.DATABASE_URL || process.env.DATABASE_URL.startsWith('mysql://')) {
+    return 'file:./dev.db';
+  }
+
+  return process.env.DATABASE_URL;
 }
+
+process.env.DATABASE_URL = resolveDatabaseUrl();
 
 declare global {
   // eslint-disable-next-line no-var

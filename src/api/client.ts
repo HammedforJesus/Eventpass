@@ -16,6 +16,9 @@ import {
 
 const TOKEN_KEY = 'eventpass_token';
 
+// Optional custom API URL for split frontend/backend deployments
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 export function getStoredToken(): string | null {
   try {
     return localStorage.getItem(TOKEN_KEY);
@@ -37,6 +40,8 @@ export function setStoredToken(token: string | null): void {
 }
 
 async function request<T>(url: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+
   const defaultHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
   };
@@ -46,14 +51,70 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<ApiRe
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...(options.headers || {}),
-    },
-    credentials: 'include', // Include HTTP-only cookies
-  });
+  let response: Response;
+  try {
+    response = await fetch(fullUrl, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...(options.headers || {}),
+      },
+      credentials: 'include', // Include HTTP-only cookies
+    });
+  } catch (netErr: any) {
+    return {
+      success: false,
+      error: {
+        code: 'NETWORK_DISCONNECTED',
+        message: 'Could not reach backend server. Please verify network connection or server status.',
+      },
+    };
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+
+  // If response is not JSON, extract informative error
+  if (!contentType.includes('application/json')) {
+    try {
+      const text = await response.text();
+      const isHtml = text.trim().toLowerCase().startsWith('<!doctype') || text.trim().toLowerCase().startsWith('<html');
+
+      if (isHtml) {
+        if (response.status === 404) {
+          return {
+            success: false,
+            error: {
+              code: 'ENDPOINT_NOT_FOUND',
+              message: `API endpoint ${url} was not found (404). Please ensure the backend server is running and /api routes are active.`,
+            },
+          };
+        }
+        return {
+          success: false,
+          error: {
+            code: 'API_HTML_FALLBACK',
+            message: `The server returned an HTML page instead of API JSON (Status: ${response.status}). If deployed statically on Vercel, the Node.js backend server or /api routes are not active.`,
+          },
+        };
+      }
+
+      return {
+        success: false,
+        error: {
+          code: 'INVALID_RESPONSE',
+          message: `Server returned non-JSON data (${response.status}): ${text.slice(0, 100)}`,
+        },
+      };
+    } catch {
+      return {
+        success: false,
+        error: {
+          code: 'PARSE_ERROR',
+          message: `Server returned unexpected format (${response.status}).`,
+        },
+      };
+    }
+  }
 
   try {
     const data = await response.json();
@@ -62,8 +123,8 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<ApiRe
     return {
       success: false,
       error: {
-        code: 'NETWORK_ERROR',
-        message: 'Network response could not be parsed.',
+        code: 'JSON_PARSE_ERROR',
+        message: 'Network response could not be parsed as JSON.',
       },
     };
   }

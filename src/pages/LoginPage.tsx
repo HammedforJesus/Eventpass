@@ -50,9 +50,16 @@ export const LoginPage: React.FC = () => {
 
         <div className="bg-white dark:bg-zinc-900 p-6 sm:p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-5">
           {error && (
-            <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/80 rounded-xl text-xs text-rose-600 dark:text-rose-400 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
+            <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/80 rounded-xl text-xs text-rose-700 dark:text-rose-300 space-y-1.5">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-500" />
+                <span className="font-medium leading-relaxed">{error}</span>
+              </div>
+              {(error.includes('HTML') || error.includes('backend') || error.includes('Vercel') || error.includes('404')) && (
+                <div className="pt-2 border-t border-rose-200/60 dark:border-rose-800/60 text-[11px] text-zinc-600 dark:text-zinc-400">
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-200">Hosting tip:</span> This app includes both a React frontend and an Express Node.js backend. If you hosted on Vercel, pull the latest code updates (with <code className="px-1 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded font-mono">/api</code> Serverless Function support) or deploy to Cloud Run / Render.
+                </div>
+              )}
             </div>
           )}
 

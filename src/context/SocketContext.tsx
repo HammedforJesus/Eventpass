@@ -14,10 +14,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    // Connect to same origin
-    const socket = io({
+    // Connect to same origin or configured API URL
+    const apiUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+    const socket = io(apiUrl || window.location.origin, {
       transports: ['websocket', 'polling'],
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 3,
+      timeout: 5000,
     });
     socketRef.current = socket;
 

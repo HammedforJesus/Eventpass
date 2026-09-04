@@ -1,25 +1,19 @@
 import http from 'http';
 import path from 'path';
 import express from 'express';
-import cookieParser from 'cookie-parser';
-import cors from 'cors';
 import { Server as SocketIOServer } from 'socket.io';
 import { createServer as createViteServer } from 'vite';
 
+import { createExpressApp } from './server/app.js';
 import { checkDatabaseConnection, prisma } from './server/db.js';
 import { seedDatabase } from './server/seed.js';
 import { initSocketIO } from './server/socket/index.js';
-import authRoutes from './server/routes/auth.js';
-import eventRoutes from './server/routes/events.js';
-import invitationRoutes from './server/routes/invitations.js';
-import checkinRoutes from './server/routes/checkin.js';
-import systemRoutes from './server/routes/system.js';
 
 const PORT = 3000;
 const HOST = '0.0.0.0';
 
 async function startServer() {
-  const app = express();
+  const app = createExpressApp();
   const server = http.createServer(app);
 
   // Initialize Socket.IO
@@ -31,38 +25,6 @@ async function startServer() {
     },
   });
   initSocketIO(io);
-
-  // Standard middleware
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-  app.use(cookieParser());
-  app.use(
-    cors({
-      origin: true,
-      credentials: true,
-    })
-  );
-
-  // Security Headers
-  app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    next();
-  });
-
-  // REST API Routes
-  app.use('/api/auth', authRoutes);
-  app.use('/api/events', eventRoutes);
-  app.use('/api/invitations', invitationRoutes);
-  app.use('/api/checkin', checkinRoutes);
-  app.use('/api/system', systemRoutes);
-
-  // Health probe
-  app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', service: 'eventpass-api', timestamp: new Date().toISOString() });
-  });
 
   // Check initial DB connectivity asynchronously without blocking server start
   checkDatabaseConnection().then(async ({ connected, error }) => {
