@@ -44,7 +44,7 @@ router.post('/seed', async (req: Request, res: Response) => {
       success: false,
       error: {
         code: 'DATABASE_UNAVAILABLE',
-        message: 'Cannot run seed: MySQL database is not connected.',
+        message: 'Cannot run seed: Database is temporarily unavailable.',
         details: error,
       },
     });

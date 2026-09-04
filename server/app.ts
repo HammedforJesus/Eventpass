@@ -11,6 +11,9 @@ import systemRoutes from './routes/system.js';
 export function createExpressApp(): express.Express {
   const app = express();
 
+  // Trust upstream reverse proxy (Vercel, Cloud Run, Nginx) so client IP is accurately recognized
+  app.set('trust proxy', true);
+
   // Parse incoming JSON and URL-encoded payloads
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));

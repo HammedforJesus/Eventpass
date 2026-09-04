@@ -65,8 +65,16 @@ export const EventCreatePage: React.FC = () => {
     e.preventDefault();
     setError(null);
 
-    const startDateTime = new Date(`${startDate}T${startTime}`);
-    const endDateTime = new Date(`${endDate}T${endTime}`);
+    // Cross-browser safe ISO date construction (handles iOS Safari and Android Chrome)
+    const safeStartTime = startTime.length === 5 ? `${startTime}:00` : startTime;
+    const safeEndTime = endTime.length === 5 ? `${endTime}:00` : endTime;
+    const startDateTime = new Date(`${startDate}T${safeStartTime}`);
+    const endDateTime = new Date(`${endDate}T${safeEndTime}`);
+
+    if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
+      setError('Please provide valid start and end dates and times.');
+      return;
+    }
 
     if (endDateTime <= startDateTime) {
       setError('Event end date and time must be after the start date and time.');
@@ -80,7 +88,11 @@ export const EventCreatePage: React.FC = () => {
 
     let rsvpDeadline: string | undefined = undefined;
     if (rsvpDeadlineDate && rsvpDeadlineTime) {
-      rsvpDeadline = new Date(`${rsvpDeadlineDate}T${rsvpDeadlineTime}`).toISOString();
+      const safeRsvpTime = rsvpDeadlineTime.length === 5 ? `${rsvpDeadlineTime}:00` : rsvpDeadlineTime;
+      const rDate = new Date(`${rsvpDeadlineDate}T${safeRsvpTime}`);
+      if (!isNaN(rDate.getTime())) {
+        rsvpDeadline = rDate.toISOString();
+      }
     }
 
     setLoading(true);

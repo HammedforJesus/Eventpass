@@ -24,7 +24,7 @@ router.get('/:token', async (req: Request, res: Response) => {
       success: false,
       error: {
         code: 'DATABASE_DISCONNECTED',
-        message: 'MySQL database is currently unavailable.',
+        message: 'Database service is temporarily unavailable. Please retry in a few moments.',
       },
     });
   }

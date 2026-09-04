@@ -6,6 +6,15 @@ import path from 'path';
 function resolveDatabaseUrl(): string {
   const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
   
+  // If a remote production database URL (e.g. Postgres, Supabase, Neon) is explicitly supplied
+  if (
+    process.env.DATABASE_URL &&
+    !process.env.DATABASE_URL.startsWith('file:') &&
+    !process.env.DATABASE_URL.startsWith('mysql://')
+  ) {
+    return process.env.DATABASE_URL;
+  }
+
   if (isServerless) {
     const tmpPath = path.join('/tmp', 'dev.db');
     if (!fs.existsSync(tmpPath)) {

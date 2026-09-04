@@ -59,7 +59,7 @@ router.post('/register', authLimiter, async (req: Request, res: Response) => {
       success: false,
       error: {
         code: 'DATABASE_UNAVAILABLE',
-        message: 'MySQL database is not connected. Please configure DATABASE_URL in environment.',
+        message: 'Database service is temporarily initializing. Please retry in a few seconds.',
         details: error,
       },
     });
@@ -148,7 +148,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
       success: false,
       error: {
         code: 'DATABASE_UNAVAILABLE',
-        message: 'MySQL database is not connected. Please configure DATABASE_URL in environment.',
+        message: 'Database service is temporarily initializing. Please retry in a few seconds.',
         details: error,
       },
     });

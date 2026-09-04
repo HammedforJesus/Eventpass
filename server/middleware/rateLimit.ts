@@ -26,8 +26,9 @@ export function createRateLimiter(options: {
   const { windowMs, max, message = 'Too many requests, please try again later.' } = options;
 
   return (req: Request, res: Response, next: NextFunction) => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const key = options.keyGenerator ? options.keyGenerator(req) : `${req.baseUrl || req.path}:${ip}`;
+    const forwarded = req.headers['x-forwarded-for'];
+    const clientIp = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : req.ip || req.socket.remoteAddress || 'unknown';
+    const key = options.keyGenerator ? options.keyGenerator(req) : `${req.baseUrl || req.path}:${clientIp}`;
     const now = Date.now();
 
     const record = rateLimitStore.get(key);
@@ -58,21 +59,28 @@ export function createRateLimiter(options: {
   };
 }
 
-// Strict limiter for 6-digit code verification (max 5 attempts per 60 seconds per IP/event)
+// Code verification limiter: generous capacity for busy doors & test check-ins
 export const codeVerificationLimiter = createRateLimiter({
   windowMs: 60 * 1000,
-  max: 6,
+  max: 60, // 60 attempts/min allows high-frequency door scanning
   message: 'Too many verification code attempts. Please wait 60 seconds before trying again.',
   keyGenerator: (req) => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : req.ip || 'unknown';
     const eventId = req.body?.eventId || 'unknown-event';
     return `verify-code:${eventId}:${ip}`;
   },
 });
 
-// Standard auth limiter
+// Standard auth limiter: prevents brute force while allowing all office/wifi testers to register and log in
 export const authLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 15,
+  max: 100, // 100 attempts per 15 mins prevents false positives
   message: 'Too many authentication attempts. Please try again in 15 minutes.',
+  keyGenerator: (req) => {
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : req.ip || 'unknown';
+    const email = req.body?.email ? String(req.body.email).toLowerCase().trim() : '';
+    return email ? `auth:${email}:${ip}` : `auth:${ip}`;
+  },
 });

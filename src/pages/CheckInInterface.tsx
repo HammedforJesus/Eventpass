@@ -174,6 +174,14 @@ export const CheckInInterface: React.FC = () => {
   // Process QR Token Scan
   const handleQRScan = async (scannedText: string) => {
     if (isProcessing || verificationResult) return;
+    if (!selectedEventId) {
+      setVerificationResult({
+        status: 'ERROR',
+        title: 'NO EVENT SELECTED',
+        message: 'Please create or select an event first before scanning attendee passes.',
+      });
+      return;
+    }
     setIsProcessing(true);
 
     try {
@@ -230,6 +238,14 @@ export const CheckInInterface: React.FC = () => {
   const handleCodeSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (isProcessing || manualCode.trim().length !== 6) return;
+    if (!selectedEventId) {
+      setVerificationResult({
+        status: 'ERROR',
+        title: 'NO EVENT SELECTED',
+        message: 'Please create or select an event first before verifying guest codes.',
+      });
+      return;
+    }
     setIsProcessing(true);
 
     try {

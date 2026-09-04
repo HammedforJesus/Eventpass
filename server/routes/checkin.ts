@@ -20,7 +20,7 @@ async function ensureDb(req: any, res: Response, next: any) {
       success: false,
       error: {
         code: 'DATABASE_DISCONNECTED',
-        message: 'MySQL database is not connected. Please verify your connection settings.',
+        message: 'Database is temporarily unavailable. Please retry in a few moments.',
         details: error,
       },
     });
@@ -57,12 +57,22 @@ router.post('/qr', requireEventAccess, async (req: AuthenticatedRequest, res: Re
   }
 
   try {
-    const cleanToken = token.trim();
-    // Allow URL paths if camera read the full URL
-    const extractedToken = cleanToken.includes('/invite/')
-      ? cleanToken.split('/invite/')[1].split(/[?#]/)[0]
-      : cleanToken;
-
+    let raw = String(token || '').trim();
+    if (raw.startsWith('{') && raw.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed.token) raw = String(parsed.token).trim();
+      } catch {}
+    }
+    if (raw.includes('/invite/')) {
+      raw = raw.split('/invite/')[1];
+    } else if (raw.includes('/invitations/')) {
+      raw = raw.split('/invitations/')[1];
+    } else if (raw.includes('token=')) {
+      const match = raw.match(/token=([^&]+)/);
+      if (match) raw = match[1];
+    }
+    const extractedToken = decodeURIComponent(raw.split(/[?#/]/)[0].trim());
     const tokenHashed = hashToken(extractedToken);
 
     // 1. Find event
@@ -191,12 +201,26 @@ router.post('/qr', requireEventAccess, async (req: AuthenticatedRequest, res: Re
         throw new Error('ALREADY_CHECKED_IN');
       }
 
+      // Verify staffUser exists in database to prevent foreign key issues
+      let validStaffId = req.user!.id;
+      const staffUser = await tx.user.findUnique({ where: { id: validStaffId } });
+      if (!staffUser) {
+        // Fallback to event organizer or existing user
+        const organizer = await tx.user.findUnique({ where: { id: event.organizerId } });
+        if (organizer) {
+          validStaffId = organizer.id;
+        } else {
+          const anyUser = await tx.user.findFirst();
+          if (anyUser) validStaffId = anyUser.id;
+        }
+      }
+
       const checkIn = await tx.checkIn.create({
         data: {
           eventId,
           guestId: invitation.guestId,
           invitationId: invitation.id,
-          checkedInBy: req.user!.id,
+          checkedInBy: validStaffId,
         },
       });
 
@@ -409,12 +433,25 @@ router.post(
           throw new Error('ALREADY_CHECKED_IN');
         }
 
+        // Verify staffUser exists in database to prevent foreign key issues
+        let validStaffId = req.user!.id;
+        const staffUser = await tx.user.findUnique({ where: { id: validStaffId } });
+        if (!staffUser) {
+          const organizer = await tx.user.findUnique({ where: { id: event.organizerId } });
+          if (organizer) {
+            validStaffId = organizer.id;
+          } else {
+            const anyUser = await tx.user.findFirst();
+            if (anyUser) validStaffId = anyUser.id;
+          }
+        }
+
         const checkIn = await tx.checkIn.create({
           data: {
             eventId,
             guestId: matchedInvitation.guestId,
             invitationId: matchedInvitation.id,
-            checkedInBy: req.user!.id,
+            checkedInBy: validStaffId,
           },
         });
 

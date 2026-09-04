@@ -41,24 +41,40 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           aspectRatio: 1.0,
         };
 
-        await html5QrCode.start(
-          { facingMode: 'environment' },
-          config,
-          (decodedText) => {
-            const now = Date.now();
-            // Throttle consecutive duplicate scans (1.5s debounce)
-            if (decodedText === lastScannedText.current && now - lastScannedTime.current < 1500) {
-              return;
-            }
-            lastScannedText.current = decodedText;
-            lastScannedTime.current = now;
-            onScanSuccess(decodedText);
-          },
-          (err) => {
-            // benign frame decode failure
-            if (onScanError) onScanError(err);
+        // Scan frame handlers
+        const onFrameSuccess = (decodedText: string) => {
+          const now = Date.now();
+          // Throttle consecutive duplicate scans (1.5s debounce)
+          if (decodedText === lastScannedText.current && now - lastScannedTime.current < 1500) {
+            return;
           }
-        );
+          lastScannedText.current = decodedText;
+          lastScannedTime.current = now;
+          onScanSuccess(decodedText);
+        };
+
+        const onFrameError = (err: any) => {
+          // benign frame decode failure
+          if (onScanError) onScanError(err);
+        };
+
+        // Try environment camera (mobile back camera), fallback to user camera (laptop/webcam)
+        try {
+          await html5QrCode.start(
+            { facingMode: 'environment' },
+            config,
+            onFrameSuccess,
+            onFrameError
+          );
+        } catch (envErr) {
+          console.log('[QRScanner] Back camera unavailable, falling back to front/user camera...');
+          await html5QrCode.start(
+            { facingMode: 'user' },
+            config,
+            onFrameSuccess,
+            onFrameError
+          );
+        }
 
         if (mounted) {
           setIsScanning(true);

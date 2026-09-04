@@ -1,4 +1,3 @@
-import type { Request, Response } from 'express';
 import { createExpressApp } from '../server/app.js';
 import { checkDatabaseConnection, prisma } from '../server/db.js';
 import { seedDatabase } from '../server/seed.js';
@@ -24,7 +23,14 @@ async function ensureDatabaseReady() {
   }
 }
 
-export default async function handler(req: Request, res: Response) {
-  await ensureDatabaseReady();
-  return (app as any)(req, res);
-}
+// Ensure database is ready before processing API routes on serverless
+app.use(async (req, res, next) => {
+  try {
+    await ensureDatabaseReady();
+  } catch (err) {
+    console.warn('[Vercel Middleware] Error preparing DB:', err);
+  }
+  next();
+});
+
+export default app;

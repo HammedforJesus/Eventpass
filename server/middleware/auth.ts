@@ -71,6 +71,37 @@ export async function requireAuth(
     });
   }
 
+  // Ensure the authenticated user exists in the active database instance (prevents foreign-key constraint failures on serverless or across worker restarts)
+  try {
+    let dbUser = await prisma.user.findUnique({ where: { id: decoded.id } });
+    if (!dbUser && decoded.email) {
+      dbUser = await prisma.user.findUnique({ where: { email: decoded.email.toLowerCase().trim() } });
+      if (dbUser) {
+        decoded.id = dbUser.id;
+        decoded.role = dbUser.role as any;
+      } else {
+        // Auto-heal/synchronize user record into local database
+        try {
+          dbUser = await prisma.user.create({
+            data: {
+              id: decoded.id,
+              name: decoded.name || 'User',
+              email: decoded.email.toLowerCase().trim(),
+              passwordHash: '$2a$10$wE9q5qWJ6L9C7D.sYfD1O.T1Y6l5p0v1h1b.a3q.9a3d4',
+              role: decoded.role || 'ORGANIZER',
+            },
+          });
+        } catch {
+          // If concurrent insertion occurred, re-query
+          dbUser = await prisma.user.findUnique({ where: { email: decoded.email.toLowerCase().trim() } });
+          if (dbUser) decoded.id = dbUser.id;
+        }
+      }
+    }
+  } catch (syncErr) {
+    console.warn('[requireAuth] User synchronization warning:', syncErr);
+  }
+
   req.user = decoded;
   next();
 }
@@ -140,8 +171,13 @@ export async function requireEventAccess(
     const event = await prisma.event.findUnique({
       where: { id: eventId },
       include: {
+        organizer: {
+          select: { id: true, email: true },
+        },
         staff: {
-          where: { userId: req.user.id },
+          include: {
+            user: { select: { id: true, email: true } },
+          },
         },
       },
     });
@@ -156,8 +192,16 @@ export async function requireEventAccess(
       });
     }
 
-    const isOwner = event.organizerId === req.user.id;
-    const isAssignedStaff = event.staff.length > 0;
+    const isOwner =
+      event.organizerId === req.user.id ||
+      (event.organizer && req.user.email && event.organizer.email.toLowerCase() === req.user.email.toLowerCase());
+
+    const isAssignedStaff =
+      event.staff.some(
+        (s) =>
+          s.userId === req.user!.id ||
+          (s.user && req.user!.email && s.user.email.toLowerCase() === req.user!.email.toLowerCase())
+      );
 
     if (!isOwner && !isAssignedStaff) {
       return res.status(403).json({

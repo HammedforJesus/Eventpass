@@ -141,6 +141,16 @@ export const RegisterPage: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
+
+          {/* Quick-fill Test Credentials */}
+          <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
+            <div className="flex items-center justify-between text-xs text-zinc-500">
+              <span className="font-medium">Testing the live deployment?</span>
+              <Link to="/login" className="font-semibold text-zinc-900 dark:text-zinc-100 underline">
+                Use Demo Login →
+              </Link>
+            </div>
+          </div>
         </div>
 
         <p className="text-center text-xs text-zinc-500">
