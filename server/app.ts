@@ -48,21 +48,16 @@ export function createExpressApp(): express.Express {
   app.get('/api/health', healthHandler);
   app.get('/health', healthHandler);
 
-  // REST API Routes - mounted at both /api/* and /* to seamlessly support both standard servers and serverless proxies
+  // REST API routes use the /api namespace so they do not collide with React pages such as /events.
   app.use('/api/auth', authRoutes);
-  app.use('/auth', authRoutes);
 
   app.use('/api/events', eventRoutes);
-  app.use('/events', eventRoutes);
 
   app.use('/api/invitations', invitationRoutes);
-  app.use('/invitations', invitationRoutes);
 
   app.use('/api/checkin', checkinRoutes);
-  app.use('/checkin', checkinRoutes);
 
   app.use('/api/system', systemRoutes);
-  app.use('/system', systemRoutes);
 
   return app;
 }

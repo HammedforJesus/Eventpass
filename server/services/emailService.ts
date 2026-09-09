@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer';
+import QRCode from 'qrcode';
+import { Resend } from 'resend';
 import fs from 'fs';
 import path from 'path';
 
@@ -14,7 +16,7 @@ export interface SentEmailRecord {
   textContent: string;
   passUrl: string;
   status: 'SENT' | 'SIMULATED' | 'FAILED';
-  deliveryMode: 'SMTP' | 'ETHEREAL' | 'SIMULATED';
+  deliveryMode: 'RESEND' | 'SMTP' | 'ETHEREAL' | 'SIMULATED';
   previewUrl?: string | null;
   messageId?: string;
   error?: string | null;
@@ -28,6 +30,17 @@ export interface SmtpConfig {
   user: string;
   pass: string;
   from: string;
+}
+
+export interface ResendConfig {
+  apiKey: string;
+  from: string;
+}
+
+export function getActiveResendConfig(): ResendConfig | null {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM?.trim();
+  return apiKey && from ? { apiKey, from } : null;
 }
 
 // In-memory store + file backup for sent emails
@@ -84,6 +97,7 @@ try {
 }
 
 export function getActiveSmtpConfig(): SmtpConfig | null {
+  if (process.env.ENABLE_SMTP !== 'true') return null;
   if (runtimeSmtpConfig && runtimeSmtpConfig.host && runtimeSmtpConfig.user) {
     return runtimeSmtpConfig;
   }
@@ -160,6 +174,7 @@ export interface InvitationEmailPayload {
   plusOne?: number;
   passUrl: string;
   verificationCode?: string;
+  qrCodeDataUrl?: string;
 }
 
 export function buildInvitationHtml(payload: InvitationEmailPayload): string {
@@ -284,6 +299,8 @@ export function buildInvitationHtml(payload: InvitationEmailPayload): string {
                 <a href="${payload.passUrl}" style="color: #60a5fa; text-decoration: underline;">${payload.passUrl}</a>
               </p>
 
+              ${payload.qrCodeDataUrl ? `<div style="text-align: center; margin: 0 0 24px 0;"><img src="cid:eventpass-qr" alt="Unique QR code for ${payload.eventName}" width="220" height="220" style="display: inline-block; background: #ffffff; padding: 12px; border-radius: 12px;"></div>` : ''}
+
               <!-- Security Notice -->
               <div style="background-color: rgba(39, 39, 42, 0.5); border: 1px dashed #3f3f46; border-radius: 8px; padding: 12px 16px; font-size: 12px; color: #a1a1aa; line-height: 1.5;">
                 🔒 <strong>Entry Instruction:</strong> When you arrive at the gate, staff will scan your digital QR pass. Please keep this email accessible or save the pass to your home screen.
@@ -348,17 +365,81 @@ Powered by EVENTPASS
  */
 export async function sendInvitationEmail(payload: InvitationEmailPayload): Promise<{
   success: boolean;
-  deliveryMode: 'SMTP' | 'ETHEREAL' | 'SIMULATED';
+  deliveryMode: 'RESEND' | 'SMTP' | 'ETHEREAL' | 'SIMULATED';
   messageId?: string;
   previewUrl?: string | null;
   error?: string;
 }> {
   const subject = `🎟️ Your Invitation to ${payload.eventName}`;
-  const html = buildInvitationHtml(payload);
+  const qrCodeDataUrl = await QRCode.toDataURL(payload.passUrl, {
+    width: 440,
+    margin: 2,
+    errorCorrectionLevel: 'M',
+  });
+  const emailPayload = { ...payload, qrCodeDataUrl };
+  const html = buildInvitationHtml(emailPayload);
   const text = buildInvitationPlainText(payload);
+  const qrAttachment = {
+    filename: 'eventpass-qr.png',
+    content: qrCodeDataUrl.split(',')[1],
+    encoding: 'base64',
+    cid: 'eventpass-qr',
+  };
 
   const smtpConfig = getActiveSmtpConfig();
   const emailId = 'email_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+
+  const resendConfig = getActiveResendConfig();
+  if (resendConfig) {
+    try {
+      const resend = new Resend(resendConfig.apiKey);
+      const result = await resend.emails.send({
+        from: resendConfig.from,
+        to: payload.guestEmail,
+        subject,
+        text,
+        html,
+        attachments: [
+          {
+            filename: 'eventpass-qr.png',
+            content: Buffer.from(qrCodeDataUrl.split(',')[1], 'base64'),
+          },
+        ],
+      });
+
+      if (result.error || !result.data?.id) {
+        throw new Error(result.error?.message || 'Resend did not return a message id.');
+      }
+
+      const record: SentEmailRecord = {
+        id: emailId,
+        eventId: payload.eventId,
+        guestId: payload.guestId,
+        invitationId: payload.invitationId,
+        recipientEmail: payload.guestEmail,
+        recipientName: payload.guestName,
+        subject,
+        htmlContent: html,
+        textContent: text,
+        passUrl: payload.passUrl,
+        status: 'SENT',
+        deliveryMode: 'RESEND',
+        messageId: result.data.id,
+        sentAt: new Date().toISOString(),
+      };
+      sentEmails.unshift(record);
+      persistEmails();
+
+      return { success: true, deliveryMode: 'RESEND', messageId: result.data.id };
+    } catch (resendErr: any) {
+      console.error(`Resend delivery to ${payload.guestEmail} failed:`, resendErr.message);
+      return {
+        success: false,
+        deliveryMode: 'RESEND',
+        error: resendErr.message || 'Resend delivery failed.',
+      };
+    }
+  }
 
   // 1. Try real custom or environment SMTP if present
   if (smtpConfig) {
@@ -379,6 +460,7 @@ export async function sendInvitationEmail(payload: InvitationEmailPayload): Prom
         subject,
         text,
         html,
+        attachments: [qrAttachment],
       });
 
       const record: SentEmailRecord = {
@@ -411,8 +493,9 @@ export async function sendInvitationEmail(payload: InvitationEmailPayload): Prom
     }
   }
 
-  // 2. Try Ethereal test service
-  try {
+  // Ethereal is available only when explicitly enabled for local testing.
+  if (process.env.ENABLE_ETHEREAL === 'true') {
+    try {
     const ethereal = await getEtherealTransporter();
     if (ethereal) {
       const info = await ethereal.sendMail({
@@ -421,6 +504,7 @@ export async function sendInvitationEmail(payload: InvitationEmailPayload): Prom
         subject,
         text,
         html,
+        attachments: [qrAttachment],
       });
 
       const previewUrl = nodemailer.getTestMessageUrl(info) || null;
@@ -453,8 +537,9 @@ export async function sendInvitationEmail(payload: InvitationEmailPayload): Prom
         previewUrl: typeof previewUrl === 'string' ? previewUrl : null,
       };
     }
-  } catch (etherealErr: any) {
-    console.warn('Ethereal dispatch failed, using simulated outbox:', etherealErr.message);
+    } catch (etherealErr: any) {
+      console.warn('Ethereal dispatch failed, using simulated outbox:', etherealErr.message);
+    }
   }
 
   // 3. Fallback: Store in local outbox
@@ -469,18 +554,20 @@ export async function sendInvitationEmail(payload: InvitationEmailPayload): Prom
     htmlContent: html,
     textContent: text,
     passUrl: payload.passUrl,
-    status: 'SIMULATED',
+    status: 'FAILED',
     deliveryMode: 'SIMULATED',
     messageId: `sim_${Date.now()}`,
+    error: 'No real email provider is configured. Set RESEND_API_KEY and RESEND_FROM.',
     sentAt: new Date().toISOString(),
   };
   sentEmails.unshift(record);
   persistEmails();
 
   return {
-    success: true,
+    success: false,
     deliveryMode: 'SIMULATED',
     messageId: record.messageId,
+    error: record.error || undefined,
   };
 }
 

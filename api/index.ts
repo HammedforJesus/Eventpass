@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createExpressApp } from '../server/app.js';
 import { checkDatabaseConnection, prisma } from '../server/db.js';
 import { seedDatabase } from '../server/seed.js';

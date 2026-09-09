@@ -18,6 +18,7 @@ import {
   sendInvitationEmail,
   getSentEmailsForEvent,
   getSentEmailById,
+  getActiveResendConfig,
   getActiveSmtpConfig,
   saveRuntimeSmtpConfig,
 } from '../services/emailService.js';
@@ -582,7 +583,7 @@ router.post('/:id/guests', async (req: AuthenticatedRequest, res: Response) => {
           token,
           tokenHash,
           verificationCodeHash,
-          status: req.body.sendImmediately ? 'SENT' : 'PENDING',
+          status: 'PENDING',
           rsvpStatus: 'PENDING',
           expiresAt,
         },
@@ -600,50 +601,23 @@ router.post('/:id/guests', async (req: AuthenticatedRequest, res: Response) => {
     await logAudit({
       actorId: req.user!.id,
       eventId,
-      action: req.body.sendImmediately ? 'INVITATION_SENT' : 'GUEST_CREATED',
+      action: 'GUEST_CREATED',
       targetType: 'Guest',
       targetId: guest.id,
       metadata: {
         name: guest.name,
         email: guest.email,
         category: guest.category,
-        sentImmediately: Boolean(req.body.sendImmediately),
+        sentImmediately: false,
       },
       req,
     });
-
-    let emailDelivery: any = null;
-    const shouldSend = req.body.sendImmediately !== false;
-    if (shouldSend && guest.invitation) {
-      try {
-        const baseUrl = getBaseUrl(req);
-        const passUrl = `${baseUrl}/invite/${guest.invitation.token}`;
-        emailDelivery = await sendInvitationEmail({
-          eventId,
-          eventName: event.name,
-          eventDescription: event.description,
-          venue: event.venue,
-          address: event.address,
-          startDateTime: event.startDateTime,
-          guestId: guest.id,
-          invitationId: guest.invitation.id,
-          guestName: guest.name,
-          guestEmail: guest.email,
-          guestCategory: guest.category,
-          plusOne: guest.plusOne,
-          passUrl,
-          verificationCode: guest.invitation.rawVerificationCode,
-        });
-      } catch (mailErr) {
-        console.warn('Failed to send invitation email on guest creation:', mailErr);
-      }
-    }
 
     return res.status(201).json({
       success: true,
       data: {
         ...guest,
-        emailDelivery,
+        emailDelivery: null,
       },
     });
   } catch (err: any) {
@@ -985,35 +959,52 @@ router.post(
         });
       }
 
-      const updated = await prisma.invitation.update({
-        where: { id: invitationId },
-        data: {
-          status: 'SENT',
-        },
-      });
+      const normalizedChannel = String(channel).toUpperCase();
+      let updatedStatus = invitation.status;
 
       const baseUrl = getBaseUrl(req);
       const passUrl = `${baseUrl}/invite/${invitation.token}`;
       let emailDelivery: any = null;
 
-      try {
-        emailDelivery = await sendInvitationEmail({
-          eventId,
-          eventName: event.name,
-          eventDescription: event.description,
-          venue: event.venue,
-          address: event.address,
-          startDateTime: event.startDateTime,
-          guestId: invitation.guest.id,
-          invitationId: invitation.id,
-          guestName: invitation.guest.name,
-          guestEmail: invitation.guest.email,
-          guestCategory: invitation.guest.category,
-          plusOne: invitation.guest.plusOne,
-          passUrl,
+      if (normalizedChannel === 'EMAIL') {
+        try {
+          emailDelivery = await sendInvitationEmail({
+            eventId,
+            eventName: event.name,
+            eventDescription: event.description,
+            venue: event.venue,
+            address: event.address,
+            startDateTime: event.startDateTime,
+            guestId: invitation.guest.id,
+            invitationId: invitation.id,
+            guestName: invitation.guest.name,
+            guestEmail: invitation.guest.email,
+            guestCategory: invitation.guest.category,
+            plusOne: invitation.guest.plusOne,
+            passUrl,
+          });
+        } catch (mailErr: any) {
+          console.warn('sendInvitationEmail failed:', mailErr);
+        }
+      }
+
+      if (normalizedChannel === 'EMAIL' && !emailDelivery?.success) {
+        return res.status(502).json({
+          success: false,
+          error: {
+            code: 'EMAIL_DELIVERY_FAILED',
+            message: emailDelivery?.error || 'Email delivery failed. Configure Resend or SMTP and try again.',
+          },
         });
-      } catch (mailErr: any) {
-        console.warn('sendInvitationEmail failed:', mailErr);
+      }
+
+      const wasDelivered = normalizedChannel !== 'EMAIL' || ['RESEND', 'SMTP'].includes(emailDelivery?.deliveryMode);
+      if (wasDelivered) {
+        const statusUpdate = await prisma.invitation.update({
+          where: { id: invitationId },
+          data: { status: 'SENT' },
+        });
+        updatedStatus = statusUpdate.status;
       }
 
       await logAudit({
@@ -1025,7 +1016,7 @@ router.post(
         metadata: {
           guestName: invitation.guest.name,
           guestEmail: invitation.guest.email,
-          channel,
+          channel: normalizedChannel,
           deliveryMode: emailDelivery?.deliveryMode || 'SIMULATED',
         },
         req,
@@ -1034,10 +1025,18 @@ router.post(
       return res.json({
         success: true,
         data: {
-          ...updated,
+          ...invitation,
+          status: updatedStatus,
           guest: invitation.guest,
           emailDelivery,
-          message: `Invitation successfully dispatched to ${invitation.guest.email}`,
+          deliveryMode: emailDelivery?.deliveryMode || null,
+          previewUrl: emailDelivery?.previewUrl || null,
+          message:
+            normalizedChannel !== 'EMAIL'
+              ? `Unique QR invitation marked as shared via ${normalizedChannel}.`
+              : ['RESEND', 'SMTP'].includes(emailDelivery?.deliveryMode)
+              ? `Unique QR invitation delivered to ${invitation.guest.email}.`
+              : `Preview created, but no real email was delivered. Configure Resend to send to ${invitation.guest.email}.`,
         },
       });
     } catch (err: any) {
@@ -1080,7 +1079,7 @@ router.post(
       for (const inv of pendingInvitations) {
         try {
           const passUrl = `${baseUrl}/invite/${inv.token}`;
-          await sendInvitationEmail({
+          const delivery = await sendInvitationEmail({
             eventId,
             eventName: event.name,
             eventDescription: event.description,
@@ -1095,6 +1094,10 @@ router.post(
             plusOne: inv.guest.plusOne,
             passUrl,
           });
+
+          if (!delivery.success) {
+            throw new Error(delivery.error || 'Email delivery failed.');
+          }
 
           await prisma.invitation.update({
             where: { id: inv.id },
@@ -1169,16 +1172,18 @@ router.get(
   '/:id/email-config',
   requireOrganizer,
   async (req: AuthenticatedRequest, res: Response) => {
+    const resend = getActiveResendConfig();
     const active = getActiveSmtpConfig();
     return res.json({
       success: true,
       data: {
-        configured: Boolean(active),
+        configured: Boolean(resend || active),
+        provider: resend ? 'RESEND' : active ? 'SMTP' : 'NONE',
         host: active?.host || null,
         port: active?.port || null,
         user: active?.user || null,
-        from: active?.from || null,
-        mode: active ? 'CUSTOM_SMTP' : 'TEST_SERVICE',
+        from: resend?.from || active?.from || null,
+        mode: resend ? 'RESEND' : active ? 'CUSTOM_SMTP' : 'TEST_SERVICE',
       },
     });
   }

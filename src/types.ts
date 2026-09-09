@@ -243,10 +243,11 @@ export interface SentEmailRecord {
 
 export interface EmailConfigStatus {
   configured: boolean;
+  provider: 'RESEND' | 'SMTP' | 'NONE';
   host: string | null;
   port: number | null;
   user: string | null;
   from: string | null;
-  mode: 'CUSTOM_SMTP' | 'TEST_SERVICE';
+  mode: 'RESEND' | 'CUSTOM_SMTP' | 'TEST_SERVICE';
 }
 

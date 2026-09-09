@@ -61,6 +61,7 @@ import {
   LineChart,
   Line,
 } from 'recharts';
+import { QRCodeDisplay } from '../components/QRCodeDisplay';
 
 export const EventDetailPage: React.FC = () => {
   const { id: eventId } = useParams<{ id: string }>();
@@ -104,6 +105,7 @@ export const EventDetailPage: React.FC = () => {
     notes: '',
   });
   const [sendImmediately, setSendImmediately] = useState(true);
+  const [addingGuest, setAddingGuest] = useState(false);
 
   // Send Invitation Modal State
   const [selectedGuestForInvite, setSelectedGuestForInvite] = useState<{
@@ -112,6 +114,7 @@ export const EventDetailPage: React.FC = () => {
   } | null>(null);
   const [sendingInvite, setSendingInvite] = useState(false);
   const [sendFeedback, setSendFeedback] = useState<string | null>(null);
+  const [emailPreviewUrl, setEmailPreviewUrl] = useState<string | null>(null);
   const [batchSending, setBatchSending] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState(false);
 
@@ -362,6 +365,7 @@ export const EventDetailPage: React.FC = () => {
   const handleAddGuest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventId) return;
+    setAddingGuest(true);
     try {
       const res = await api.events.addGuest(eventId, {
         ...newGuest,
@@ -389,6 +393,8 @@ export const EventDetailPage: React.FC = () => {
       }
     } catch (err: any) {
       alert(err.message);
+    } finally {
+      setAddingGuest(false);
     }
   };
 
@@ -399,6 +405,7 @@ export const EventDetailPage: React.FC = () => {
       invitation: guest.invitation,
     });
     setSendFeedback(null);
+    setEmailPreviewUrl(null);
     setCopiedMessage(false);
   };
 
@@ -408,7 +415,8 @@ export const EventDetailPage: React.FC = () => {
     try {
       const res = await api.events.sendInvitation(eventId, invitationId, channel);
       if (res.success) {
-        setSendFeedback(res.data?.message || `Invitation dispatched via ${channel}!`);
+        setEmailPreviewUrl(res.data?.previewUrl || null);
+        setSendFeedback(res.data?.message || `Invitation shared via ${channel}.`);
         loadGuests();
         loadEvent();
         loadAuditLogs();
@@ -1153,7 +1161,7 @@ export const EventDetailPage: React.FC = () => {
                 className="px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition flex items-center gap-1.5 cursor-pointer"
               >
                 <Settings className="w-3.5 h-3.5" />
-                <span>Configure SMTP</span>
+                <span>Configure Email Delivery</span>
                 {emailConfig?.configured && (
                   <span className="w-2 h-2 rounded-full bg-emerald-500" title="Custom SMTP Active" />
                 )}
@@ -1188,8 +1196,10 @@ export const EventDetailPage: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <h4 className="text-xs font-bold text-zinc-900 dark:text-white">
                       {emailConfig?.configured
-                        ? `Live SMTP Active (${emailConfig.host})`
-                        : 'Simulated & Test Delivery Mode'}
+                        ? emailConfig.provider === 'RESEND'
+                          ? `Resend Active (${emailConfig.from || 'configured sender'})`
+                          : `Live SMTP Active (${emailConfig.host})`
+                        : 'Email Delivery Not Configured'}
                     </h4>
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -1198,13 +1208,15 @@ export const EventDetailPage: React.FC = () => {
                           : 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
                       }`}
                     >
-                      {emailConfig?.configured ? 'LIVE DELIVERY' : 'LOCAL / TEST'}
+                      {emailConfig?.configured ? `${emailConfig.provider} DELIVERY` : 'NOT CONFIGURED'}
                     </span>
                   </div>
                   <p className="text-xs text-zinc-500 mt-0.5">
                     {emailConfig?.configured
-                      ? `Outgoing invitation emails are sent directly through ${emailConfig.host} from "${emailConfig.from || emailConfig.user}".`
-                      : 'Invitations are generated, logged, and rendered immediately. To send real emails directly to external inboxes, connect your SMTP account (e.g. Gmail App Password, SendGrid, or Brevo).'}
+                      ? emailConfig.provider === 'RESEND'
+                        ? `Outgoing invitation emails are sent through Resend from "${emailConfig.from}".`
+                        : `Outgoing invitation emails are sent directly through ${emailConfig.host} from "${emailConfig.from || emailConfig.user}".`
+                      : 'Real email is not configured. Add RESEND_API_KEY and RESEND_FROM to the server environment, then restart the server.'}
                   </p>
                 </div>
               </div>
@@ -1681,9 +1693,10 @@ export const EventDetailPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-semibold bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 rounded-xl hover:opacity-90"
+                  disabled={addingGuest}
+                  className="px-4 py-2 text-xs font-semibold bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 rounded-xl hover:opacity-90 disabled:opacity-50"
                 >
-                  Save & Generate Invitation
+                  {addingGuest ? 'Saving Guest...' : 'Save & Generate Invitation'}
                 </button>
               </div>
             </form>
@@ -1843,7 +1856,17 @@ export const EventDetailPage: React.FC = () => {
             {sendFeedback && (
               <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 rounded-xl text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
                 <CheckCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>{sendFeedback}</span>
+                <span className="flex-1">{sendFeedback}</span>
+                {emailPreviewUrl && (
+                  <a
+                    href={emailPreviewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold underline shrink-0"
+                  >
+                    Open preview
+                  </a>
+                )}
               </div>
             )}
 
@@ -1896,6 +1919,28 @@ export const EventDetailPage: React.FC = () => {
               </div>
             </div>
 
+            {/* The invitation token is the guest-specific QR credential stored under this event. */}
+            <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-center space-y-2">
+              <div className="flex items-center justify-between text-left">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-zinc-400">Guest QR pass</p>
+                  <p className="text-xs font-semibold text-zinc-900 dark:text-white">{event.name}</p>
+                </div>
+                <span className="font-mono text-[10px] text-zinc-500">
+                  QR ID #{selectedGuestForInvite.invitation.id.slice(0, 7).toUpperCase()}
+                </span>
+              </div>
+              <QRCodeDisplay
+                token={selectedGuestForInvite.invitation.token}
+                guestName={selectedGuestForInvite.guest.name}
+                eventName={event.name}
+                size={150}
+              />
+              <p className="text-[11px] text-zinc-500">
+                This QR code is unique to {selectedGuestForInvite.guest.name} for this event.
+              </p>
+            </div>
+
             {/* Delivery Channels Grid */}
             <div className="space-y-3">
               {/* Primary Automated Dispatch */}
@@ -1914,7 +1959,7 @@ export const EventDetailPage: React.FC = () => {
                         : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
                     }`}
                   >
-                    {emailConfig?.configured ? 'SMTP ACTIVE' : 'TEST MODE'}
+                    {emailConfig?.configured ? 'SMTP ACTIVE' : 'PREVIEW ONLY'}
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-500">
@@ -1922,7 +1967,12 @@ export const EventDetailPage: React.FC = () => {
                   <strong className="text-zinc-700 dark:text-zinc-300 font-mono">
                     {selectedGuestForInvite.guest.email}
                   </strong>
-                  .
+                  .{' '}
+                  {emailConfig?.configured
+                      ? emailConfig.provider === 'RESEND'
+                        ? 'This uses your configured Resend account.'
+                        : 'This uses your configured SMTP server.'
+                      : 'Email delivery is not configured, so no message will reach the guest.'}
                 </p>
                 <div className="flex items-center gap-2 pt-1">
                   <button
@@ -2040,15 +2090,25 @@ export const EventDetailPage: React.FC = () => {
                   const text = `Hi ${selectedGuestForInvite.guest.name}! Here is your invitation and gate pass for *${event.name}*:\n\n📅 ${new Date(
                     event.startDateTime
                   ).toLocaleDateString()}\n📍 ${event.venue}\n\n👉 Access your pass: ${passUrl}`;
-                  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+                  const phone = selectedGuestForInvite.guest.phone?.replace(/[^\d]/g, '');
+                  const whatsappUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : null;
 
                   return (
                     <a
-                      href={whatsappUrl}
+                      href={whatsappUrl || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={() => handleMarkAsSent(selectedGuestForInvite.invitation.id, 'WHATSAPP')}
-                      className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-emerald-400 dark:hover:border-emerald-600 bg-zinc-50 dark:bg-zinc-950 flex items-center gap-3 transition group"
+                      onClick={(clickEvent) => {
+                        if (!phone) {
+                          clickEvent.preventDefault();
+                          setSendFeedback('Add the guest phone with country code, for example +2348012345678, before using WhatsApp.');
+                          return;
+                        }
+                        handleMarkAsSent(selectedGuestForInvite.invitation.id, 'WHATSAPP');
+                      }}
+                      className={`p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 flex items-center gap-3 transition group ${
+                        phone ? 'hover:border-emerald-400 dark:hover:border-emerald-600' : 'opacity-60'
+                      }`}
                     >
                       <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                         <MessageSquare className="w-4 h-4" />
@@ -2058,7 +2118,7 @@ export const EventDetailPage: React.FC = () => {
                           WhatsApp
                         </p>
                         <p className="text-[11px] text-zinc-500 truncate">
-                          Send pass via chat
+                          {phone ? 'Send pass via chat' : 'Guest phone required'}
                         </p>
                       </div>
                     </a>
@@ -2259,7 +2319,7 @@ export const EventDetailPage: React.FC = () => {
               <div>
                 <h3 className="font-bold text-base text-zinc-950 dark:text-white flex items-center gap-2">
                   <Server className="w-4 h-4 text-blue-500" />
-                  <span>Outgoing SMTP Server Settings</span>
+                  <span>Outgoing Email Settings</span>
                 </h3>
                 <p className="text-xs text-zinc-500 mt-0.5">
                   Connect any standard email provider to deliver invitations directly to real user inboxes.
@@ -2277,7 +2337,7 @@ export const EventDetailPage: React.FC = () => {
               <p className="font-semibold">Quick setup guides:</p>
               <ul className="list-disc list-inside text-[11px] space-y-0.5 text-zinc-600 dark:text-zinc-400">
                 <li>
-                  <strong>Gmail / Google Workspace:</strong> Host: <code className="font-mono">smtp.gmail.com</code>, Port: 587, User: your email, Password: Google <em>App Password</em> (created at myaccount.google.com/apppasswords).
+                  <strong>Recommended: Resend:</strong> Set <code className="font-mono">RESEND_API_KEY</code> and <code className="font-mono">RESEND_FROM</code> in the server environment. Verify the sender domain in Resend before sending to guests.
                 </li>
                 <li>
                   <strong>SendGrid:</strong> Host: <code className="font-mono">smtp.sendgrid.net</code>, Port: 587, User: <code className="font-mono">apikey</code>, Password: your SendGrid API key.

@@ -153,10 +153,13 @@ export const api = {
     revokeInvitation: (id: string, invitationId: string) => request(`/api/events/${id}/invitations/${invitationId}/revoke`, { method: 'POST' }),
     regenerateInvitation: (id: string, invitationId: string) => request(`/api/events/${id}/invitations/${invitationId}/regenerate`, { method: 'POST' }),
     sendInvitation: (id: string, invitationId: string, channel: string = 'EMAIL') =>
-      request<{ message: string }>(`/api/events/${id}/invitations/${invitationId}/send`, {
-        method: 'POST',
-        body: JSON.stringify({ channel }),
-      }),
+      request<{ message: string; deliveryMode?: string | null; previewUrl?: string | null }>(
+        `/api/events/${id}/invitations/${invitationId}/send`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ channel }),
+        }
+      ),
     sendAllInvitations: (id: string) =>
       request<{ sentCount: number; message: string }>(`/api/events/${id}/invitations/send-all`, {
         method: 'POST',
