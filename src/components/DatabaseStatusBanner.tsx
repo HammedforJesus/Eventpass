@@ -163,14 +163,14 @@ export const DatabaseStatusBanner: React.FC = () => {
 
             {/* Connection instructions */}
             <div className="space-y-2 text-xs text-zinc-600 dark:text-zinc-400">
-              <h4 className="font-semibold text-zinc-900 dark:text-zinc-100">Connecting MySQL:</h4>
+              <h4 className="font-semibold text-zinc-900 dark:text-zinc-100">Connecting PostgreSQL:</h4>
               <p>
-                EVENTPASS uses a strict MySQL database with Prisma migrations. Set your environment variable:
+                EVENTPASS uses a persistent PostgreSQL database. Set your environment variable:
               </p>
               <div className="relative font-mono bg-zinc-900 text-zinc-200 p-2.5 rounded-lg">
-                <code>DATABASE_URL="mysql://root:password@localhost:3306/eventpass"</code>
+                <code>DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require"</code>
                 <button
-                  onClick={() => copyToClipboard('DATABASE_URL="mysql://root:password@localhost:3306/eventpass"')}
+                  onClick={() => copyToClipboard('DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require"')}
                   className="absolute right-2 top-2 p-1 text-zinc-400 hover:text-zinc-100 cursor-pointer"
                   title="Copy"
                 >
