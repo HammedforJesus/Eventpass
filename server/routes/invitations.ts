@@ -164,7 +164,7 @@ router.post('/:token/rsvp', async (req: Request, res: Response) => {
   if (!connected) {
     return res.status(503).json({
       success: false,
-      error: { code: 'DATABASE_DISCONNECTED', message: 'MySQL database is unavailable.' },
+      error: { code: 'DATABASE_DISCONNECTED', message: 'PostgreSQL database is unavailable.' },
     });
   }
 

@@ -213,7 +213,7 @@ export interface ApiResponse<T = any> {
 export interface SystemStatus {
   database: {
     connected: boolean;
-    type: 'mysql' | 'sqlite';
+    type: 'postgresql';
     databaseUrlConfigured: boolean;
     maskedUrl: string;
     error: string | null;

@@ -1,47 +1,14 @@
 import { PrismaClient } from '@prisma/client';
-import fs from 'fs';
-import path from 'path';
 
-// Resolve database URL, ensuring that serverless platforms (e.g. Vercel) have a writable SQLite file in /tmp
 function resolveDatabaseUrl(): string {
-  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-  
-  // If a remote production database URL (e.g. Postgres, Supabase, Neon) is explicitly supplied
-  if (
-    process.env.DATABASE_URL &&
-    !process.env.DATABASE_URL.startsWith('file:') &&
-    !process.env.DATABASE_URL.startsWith('mysql://')
-  ) {
-    return process.env.DATABASE_URL;
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL must point to a persistent PostgreSQL database.');
   }
-
-  if (isServerless) {
-    const tmpPath = path.join('/tmp', 'dev.db');
-    if (!fs.existsSync(tmpPath)) {
-      const candidates = [
-        path.join(process.cwd(), 'prisma', 'dev.db'),
-        path.join(process.cwd(), 'dev.db'),
-      ];
-      for (const src of candidates) {
-        if (fs.existsSync(src)) {
-          try {
-            fs.copyFileSync(src, tmpPath);
-            console.log(`[DB] Copied SQLite database to writable path: ${tmpPath}`);
-            break;
-          } catch (copyErr) {
-            console.warn('[DB] Could not copy SQLite database to /tmp:', copyErr);
-          }
-        }
-      }
-    }
-    return `file:${tmpPath}`;
+  if (databaseUrl.startsWith('file:')) {
+    throw new Error('SQLite DATABASE_URL is not supported. Vercel requires a persistent PostgreSQL database.');
   }
-
-  if (!process.env.DATABASE_URL || process.env.DATABASE_URL.startsWith('mysql://')) {
-    return 'file:./dev.db';
-  }
-
-  return process.env.DATABASE_URL;
+  return databaseUrl;
 }
 
 process.env.DATABASE_URL = resolveDatabaseUrl();
@@ -90,16 +57,12 @@ export async function checkDatabaseConnection(): Promise<{
 }
 
 export function getDatabaseStatus() {
-  const rawUrl = process.env.DATABASE_URL || 'file:./dev.db';
-  const isSqlite = rawUrl.startsWith('file:');
-  // Mask password for security if remote URL
-  const maskedUrl = isSqlite
-    ? rawUrl
-    : rawUrl.replace(/(mysql:\/\/[^:]+:)([^@]+)(@.+)/, '$1******$3');
+  const rawUrl = process.env.DATABASE_URL || '';
+  const maskedUrl = rawUrl.replace(/(postgres(?:ql)?:\/\/[^:]+:)([^@]+)(@.+)/, '$1******$3');
 
   return {
     connected: isDbConnected,
-    type: (isSqlite ? 'sqlite' : 'mysql') as 'sqlite' | 'mysql',
+    type: 'postgresql' as const,
     databaseUrlConfigured: Boolean(process.env.DATABASE_URL),
     maskedUrl: maskedUrl || 'Not configured in environment',
     error: dbLastError,

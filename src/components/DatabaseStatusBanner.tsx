@@ -91,11 +91,7 @@ export const DatabaseStatusBanner: React.FC = () => {
       >
         <Database className={`w-3.5 h-3.5 ${isConnected ? 'text-emerald-600' : 'text-amber-600'}`} />
         <span>
-          {isConnected
-            ? status.database.type === 'sqlite'
-              ? 'SQLite Connected'
-              : 'MySQL Connected'
-            : 'Database Offline'}
+          {isConnected ? 'PostgreSQL Connected' : 'Database Offline'}
         </span>
       </button>
 
@@ -111,7 +107,7 @@ export const DatabaseStatusBanner: React.FC = () => {
                 <div>
                   <h3 className="font-bold text-base">Database Architecture & Status</h3>
                   <p className="text-xs text-zinc-500">
-                    Prisma ORM ({status.database.type === 'sqlite' ? 'SQLite Engine - Zero Config' : 'MySQL Engine'})
+                    Prisma ORM (PostgreSQL Engine)
                   </p>
                 </div>
               </div>

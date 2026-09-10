@@ -162,7 +162,7 @@ export async function requireEventAccess(
       success: false,
       error: {
         code: 'DATABASE_DISCONNECTED',
-        message: 'MySQL database is not connected. Please verify your connection settings.',
+        message: 'PostgreSQL database is not connected. Please verify your connection settings.',
       },
     });
   }
