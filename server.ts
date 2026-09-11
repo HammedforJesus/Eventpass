@@ -9,6 +9,7 @@ import { createExpressApp } from './server/app.js';
 import { checkDatabaseConnection, prisma } from './server/db.js';
 import { seedDatabase } from './server/seed.js';
 import { initSocketIO } from './server/socket/index.js';
+import { cleanupExpiredEvents } from './server/utils/eventCleanup.js';
 
 const PORT = 3000;
 const HOST = '0.0.0.0';
@@ -32,6 +33,7 @@ async function startServer() {
     if (connected) {
       console.log('✔ Connected to SQLite Database via Prisma');
       try {
+        await cleanupExpiredEvents();
         const userCount = await prisma.user.count();
         if (userCount === 0) {
           console.log('Database empty. Running initial development seed...');
@@ -46,6 +48,11 @@ async function startServer() {
       console.warn('EVENTPASS is running with active database diagnostics at /api/system/status');
     }
   });
+
+  // Keep retention enforcement active while the long-running server is online.
+  setInterval(() => {
+    cleanupExpiredEvents().catch((cleanupErr) => console.error('Event cleanup error:', cleanupErr));
+  }, 60 * 60 * 1000);
 
   // Vite integration
   if (process.env.NODE_ENV !== 'production') {

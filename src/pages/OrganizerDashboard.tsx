@@ -18,6 +18,7 @@ import {
   ExternalLink,
   Sparkles,
   BarChart2,
+  Trash2,
 } from 'lucide-react';
 
 export const OrganizerDashboard: React.FC = () => {
@@ -41,6 +42,18 @@ export const OrganizerDashboard: React.FC = () => {
       setError(err.message || 'Error loading dashboard.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteEvent = async (event: EventItem) => {
+    if (user?.role !== 'ORGANIZER') return;
+    if (!confirm(`Delete "${event.name}" and all of its guests, passes, and check-ins? This cannot be undone.`)) return;
+
+    const res = await api.events.delete(event.id);
+    if (res.success) {
+      setEvents((current) => current.filter((item) => item.id !== event.id));
+    } else {
+      alert(res.error?.message || 'Failed to delete event.');
     }
   };
 
@@ -191,6 +204,10 @@ export const OrganizerDashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {events.map((ev) => {
               const start = new Date(ev.startDateTime);
+              const end = new Date(ev.endDateTime);
+              const daysSinceEnd = Math.max(0, Math.floor((Date.now() - end.getTime()) / (24 * 60 * 60 * 1000)));
+              const isPast = end.getTime() < Date.now();
+              const daysUntilDeletion = Math.max(0, 10 - daysSinceEnd);
               const dateStr = start.toLocaleDateString([], {
                 weekday: 'short',
                 month: 'short',
@@ -235,6 +252,14 @@ export const OrganizerDashboard: React.FC = () => {
                     </div>
 
                     <div className="space-y-1.5 text-xs text-zinc-600 dark:text-zinc-400">
+                      {isPast && (
+                        <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 px-2.5 py-2 text-amber-800 dark:text-amber-300">
+                          <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                          <span>
+                            Event date passed. It will be deleted automatically in {daysUntilDeletion} day{daysUntilDeletion === 1 ? '' : 's'}.
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-2">
                         <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                         <span>{dateStr} · {timeStr}</span>
@@ -273,6 +298,17 @@ export const OrganizerDashboard: React.FC = () => {
                     >
                       Manage Event
                     </Link>
+
+                    {user?.role === 'ORGANIZER' && (
+                      <button
+                        type="button"
+                        title="Delete event"
+                        onClick={() => handleDeleteEvent(ev)}
+                        className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
 
                     <Link
                       to={`/events/${ev.id}/check-in`}

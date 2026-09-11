@@ -583,13 +583,30 @@ export const EventDetailPage: React.FC = () => {
         setShowAddStaffModal(false);
         setNewStaff({ email: '', name: '' });
         loadStaff();
-        alert('Staff assigned successfully! They can now log in and scan at the gate.');
+        alert('Staff assigned successfully. Gmail will open with their gate access message ready to send.');
+        if (res.data) openStaffGmail(res.data);
       } else {
         alert(res.error?.message || 'Failed to assign staff');
       }
     } catch (err: any) {
       alert(err.message);
     }
+  };
+
+  const openStaffGmail = (assignedStaff: EventStaffItem) => {
+    if (!event) return;
+    const checkInUrl = `${window.location.origin}/events/${event.id}/check-in`;
+    const subject = `Gate access assigned: ${event.name}`;
+    const body = `Hi ${assignedStaff.user.name},\n\nYou have been assigned as gate staff for ${event.name}.\n\nEvent date: ${new Date(
+      event.startDateTime
+    ).toLocaleDateString()} at ${new Date(event.startDateTime).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    })}\nVenue: ${event.venue}, ${event.address}\n\nOpen the gate scanner here:\n${checkInUrl}\n\nSign in with your assigned EventPass account before scanning guest QR codes or six-digit gate codes.\n\nThank you.`;
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
+      assignedStaff.user.email
+    )}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(gmailUrl, '_blank', 'noopener,noreferrer');
   };
 
   // Remove Staff
@@ -1419,7 +1436,7 @@ export const EventDetailPage: React.FC = () => {
                   <th className="p-3.5">Staff Member</th>
                   <th className="p-3.5">Email</th>
                   <th className="p-3.5">Assigned On</th>
-                  <th className="p-3.5 text-right">Remove</th>
+                  <th className="p-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
@@ -1436,6 +1453,14 @@ export const EventDetailPage: React.FC = () => {
                       <td className="p-3.5 text-zinc-500 font-mono">{s.user.email}</td>
                       <td className="p-3.5 text-zinc-500">{new Date(s.assignedAt).toLocaleDateString()}</td>
                       <td className="p-3.5 text-right">
+                        <button
+                          type="button"
+                          title="Email gate access through Gmail"
+                          onClick={() => openStaffGmail(s)}
+                          className="p-1.5 mr-1 text-zinc-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30 transition cursor-pointer"
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => handleRemoveStaff(s.id)}
                           className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
@@ -1616,10 +1641,10 @@ export const EventDetailPage: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold">Email Address *</label>
+                <label className="text-xs font-semibold">Email Address (optional)</label>
                 <input
                   type="email"
-                  required
+                  // required
                   value={newGuest.email}
                   onChange={(e) => setNewGuest({ ...newGuest, email: e.target.value })}
                   placeholder="elena@company.com"

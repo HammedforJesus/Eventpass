@@ -22,6 +22,7 @@ import {
   getActiveSmtpConfig,
   saveRuntimeSmtpConfig,
 } from '../services/emailService.js';
+import { cleanupExpiredEvents } from '../utils/eventCleanup.js';
 
 const router = Router();
 
@@ -130,6 +131,7 @@ async function getEventWithAccess(
 router.get('/', async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   try {
+    await cleanupExpiredEvents();
     let events;
     if (user.role === 'ORGANIZER') {
       const userEmail = (user.email || '').toLowerCase().trim();
@@ -315,6 +317,7 @@ router.post('/', requireOrganizer, async (req: AuthenticatedRequest, res: Respon
  */
 router.get('/:id', requireEventAccess, async (req: AuthenticatedRequest, res: Response) => {
   try {
+    await cleanupExpiredEvents();
     const event = await prisma.event.findUnique({
       where: { id: req.params.id },
       include: {
