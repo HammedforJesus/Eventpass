@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { Navbar } from './components/Navbar';
@@ -38,6 +38,19 @@ const ProtectedRoute: React.FC<{
   }
 
   return <>{children}</>;
+};
+
+const GateCheckInRoute: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const { user, loading } = useAuth();
+  const gateToken = searchParams.get('gate');
+
+  if (gateToken) return <CheckInInterface />;
+  return (
+    <ProtectedRoute>
+      {loading ? <div /> : user ? <CheckInInterface /> : <Navigate to="/login" replace />}
+    </ProtectedRoute>
+  );
 };
 
 export default function App() {
@@ -103,11 +116,7 @@ export default function App() {
                 {/* Dedicated Gate Scanner Interface for Specific Event */}
                 <Route
                   path="/events/:id/check-in"
-                  element={
-                    <ProtectedRoute>
-                      <CheckInInterface />
-                    </ProtectedRoute>
-                  }
+                  element={<GateCheckInRoute />}
                 />
 
                 {/* Fallback */}

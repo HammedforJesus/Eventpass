@@ -23,6 +23,7 @@ import {
   saveRuntimeSmtpConfig,
 } from '../services/emailService.js';
 import { cleanupExpiredEvents } from '../utils/eventCleanup.js';
+import { createGateAccessToken } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -1299,7 +1300,10 @@ router.get('/:id/staff', requireEventAccess, async (req: AuthenticatedRequest, r
       orderBy: { assignedAt: 'desc' },
     });
 
-    return res.json({ success: true, data: staffList });
+    return res.json({
+      success: true,
+      data: staffList.map((staffMember) => ({ ...staffMember, gateToken: createGateAccessToken(eventId) })),
+    });
   } catch (err: any) {
     return res.status(500).json({
       success: false,
@@ -1387,7 +1391,10 @@ router.post('/:id/staff', async (req: AuthenticatedRequest, res: Response) => {
       req,
     });
 
-    return res.status(201).json({ success: true, data: assignment });
+    return res.status(201).json({
+      success: true,
+      data: { ...assignment, gateToken: createGateAccessToken(eventId) },
+    });
   } catch (err: any) {
     console.error('Assign staff error:', err);
     return res.status(500).json({

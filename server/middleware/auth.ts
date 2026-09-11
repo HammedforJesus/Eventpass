@@ -1,8 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { prisma, checkDatabaseConnection } from '../db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'eventpass-jwt-secret-dev-2026-secure-key';
+
+export function createGateAccessToken(eventId: string): string {
+  return createHmac('sha256', JWT_SECRET).update(`gate:${eventId}`).digest('hex');
+}
+
+function isValidGateAccessToken(eventId: string, token: string): boolean {
+  const expected = Buffer.from(createGateAccessToken(eventId));
+  const provided = Buffer.from(token);
+  return expected.length === provided.length && timingSafeEqual(expected, provided);
+}
 
 export interface AuthUser {
   id: string;
@@ -233,4 +244,30 @@ export async function requireEventAccess(
       },
     });
   }
+}
+
+/** Allows a signed event gate link to use the scanner without a staff login. */
+export async function requireAuthOrGateAccess(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  const eventId = req.params.id || req.params.eventId || req.body?.eventId || req.query.eventId;
+  const gateToken = String(req.body?.gateToken || req.query.gateToken || req.headers['x-gate-token'] || '');
+
+  if (eventId && gateToken && isValidGateAccessToken(String(eventId), gateToken)) {
+    const event = await prisma.event.findUnique({ where: { id: String(eventId) } });
+    if (!event) {
+      return res.status(404).json({ success: false, error: { code: 'EVENT_NOT_FOUND', message: 'The requested event does not exist.' } });
+    }
+    req.user = {
+      id: event.organizerId,
+      name: 'Gate Scanner',
+      email: 'gate-scanner@eventpass.local',
+      role: 'ORGANIZER',
+    };
+    return next();
+  }
+
+  return requireAuth(req, res, next);
 }

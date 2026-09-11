@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma, checkDatabaseConnection } from '../db.js';
 import {
-  requireAuth,
+  requireAuthOrGateAccess,
   requireEventAccess,
   AuthenticatedRequest,
 } from '../middleware/auth.js';
@@ -28,7 +28,18 @@ async function ensureDb(req: any, res: Response, next: any) {
   next();
 }
 
-router.use(requireAuth, ensureDb);
+router.use(requireAuthOrGateAccess, ensureDb);
+
+router.get('/event/:id', requireEventAccess, async (req: AuthenticatedRequest, res: Response) => {
+  const event = await prisma.event.findUnique({
+    where: { id: req.params.id },
+    include: { _count: { select: { guests: true, checkIns: true } } },
+  });
+  if (!event) {
+    return res.status(404).json({ success: false, error: { code: 'EVENT_NOT_FOUND', message: 'The requested event does not exist.' } });
+  }
+  return res.json({ success: true, data: event });
+});
 
 /**
  * Helper to compute live event stats for broadcast

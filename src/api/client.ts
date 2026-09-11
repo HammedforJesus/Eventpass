@@ -188,10 +188,16 @@ export const api = {
       request<RsvpResponseData>(`/api/invitations/${token}/rsvp`, { method: 'POST', body: JSON.stringify({ status }) }),
   },
   checkin: {
-    qr: (eventId: string, token: string) =>
-      request<CheckInResponseData>('/api/checkin/qr', { method: 'POST', body: JSON.stringify({ eventId, token }) }),
-    code: (eventId: string, code: string) =>
-      request<CheckInResponseData>('/api/checkin/code', { method: 'POST', body: JSON.stringify({ eventId, code }) }),
+    event: (eventId: string, gateToken?: string) =>
+      request<EventItem>(
+        `/api/checkin/event/${eventId}?eventId=${encodeURIComponent(eventId)}${
+          gateToken ? `&gateToken=${encodeURIComponent(gateToken)}` : ''
+        }`
+      ),
+    qr: (eventId: string, token: string, gateToken?: string) =>
+      request<CheckInResponseData>('/api/checkin/qr', { method: 'POST', body: JSON.stringify({ eventId, token, gateToken }) }),
+    code: (eventId: string, code: string, gateToken?: string) =>
+      request<CheckInResponseData>('/api/checkin/code', { method: 'POST', body: JSON.stringify({ eventId, code, gateToken }) }),
   },
   system: {
     status: () => request<SystemStatus>('/api/system/status'),

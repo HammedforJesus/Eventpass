@@ -111,6 +111,7 @@ export interface EventStaffItem {
   eventId: string;
   userId: string;
   assignedAt: string;
+  gateToken?: string;
   user: {
     id: string;
     name: string;

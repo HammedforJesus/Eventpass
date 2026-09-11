@@ -26,6 +26,8 @@ export const CheckInInterface: React.FC = () => {
   const { id: routeEventId } = useParams<{ id: string }>();
   const { user } = useAuth();
   const { joinEvent, leaveEvent, onCheckIn } = useSocket();
+  const gateToken = new URLSearchParams(window.location.search).get('gate') || undefined;
+  const isGateAccess = Boolean(routeEventId && gateToken);
 
   const [events, setEvents] = useState<EventItem[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>(routeEventId || '');
@@ -101,6 +103,7 @@ export const CheckInInterface: React.FC = () => {
 
   // Load events
   useEffect(() => {
+    if (isGateAccess) return;
     api.events.list().then((res) => {
       if (res.success && res.data) {
         setEvents(res.data);
@@ -109,13 +112,17 @@ export const CheckInInterface: React.FC = () => {
         }
       }
     });
-  }, []);
+  }, [isGateAccess]);
 
   // Update current event and metrics
   useEffect(() => {
     if (!selectedEventId) return;
 
-    api.events.get(selectedEventId).then((res) => {
+    const eventRequest = isGateAccess
+      ? api.checkin.event(selectedEventId, gateToken)
+      : api.events.get(selectedEventId);
+
+    eventRequest.then((res) => {
       if (res.success && res.data) {
         setCurrentEvent(res.data);
         const checked = res.data._count?.checkIns || 0;
@@ -147,7 +154,7 @@ export const CheckInInterface: React.FC = () => {
       leaveEvent(selectedEventId);
       cleanup();
     };
-  }, [selectedEventId]);
+  }, [selectedEventId, isGateAccess, gateToken]);
 
   // Clean auto-reset timer on unmount
   useEffect(() => {
@@ -185,7 +192,7 @@ export const CheckInInterface: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      const res = await api.checkin.qr(selectedEventId, scannedText);
+      const res = await api.checkin.qr(selectedEventId, scannedText, gateToken);
 
       if (res.success && res.data) {
         playFeedbackSound('success');
@@ -249,7 +256,7 @@ export const CheckInInterface: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      const res = await api.checkin.code(selectedEventId, manualCode.trim());
+      const res = await api.checkin.code(selectedEventId, manualCode.trim(), gateToken);
 
       if (res.success && res.data) {
         playFeedbackSound('success');
@@ -305,7 +312,7 @@ export const CheckInInterface: React.FC = () => {
       if (next.length === 6) {
         // Auto submit on 6 digits
         setTimeout(() => {
-          api.checkin.code(selectedEventId, next).then((res) => {
+          api.checkin.code(selectedEventId, next, gateToken).then((res) => {
             if (res.success && res.data) {
               playFeedbackSound('success');
               setVerificationResult({
@@ -355,7 +362,7 @@ export const CheckInInterface: React.FC = () => {
             </div>
 
             {/* Event Selector */}
-            <select
+            {!isGateAccess && <select
               value={selectedEventId}
               onChange={(e) => {
                 setSelectedEventId(e.target.value);
@@ -368,7 +375,7 @@ export const CheckInInterface: React.FC = () => {
                   {ev.name} ({ev.venue})
                 </option>
               ))}
-            </select>
+            </select>}
           </div>
 
           <div className="flex items-center gap-3">

@@ -577,25 +577,34 @@ export const EventDetailPage: React.FC = () => {
   const handleAssignStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventId) return;
+    const gmailWindow = window.open('', '_blank');
+
     try {
       const res = await api.events.assignStaff(eventId, newStaff);
       if (res.success) {
         setShowAddStaffModal(false);
         setNewStaff({ email: '', name: '' });
         loadStaff();
-        alert('Staff assigned successfully. Gmail will open with their gate access message ready to send.');
-        if (res.data) openStaffGmail(res.data);
+        if (res.data) {
+          openStaffGmail(res.data, gmailWindow);
+        } else {
+          gmailWindow?.close();
+        }
       } else {
+        gmailWindow?.close();
         alert(res.error?.message || 'Failed to assign staff');
       }
     } catch (err: any) {
+      gmailWindow?.close();
       alert(err.message);
     }
   };
 
-  const openStaffGmail = (assignedStaff: EventStaffItem) => {
+  const openStaffGmail = (assignedStaff: EventStaffItem, targetWindow: Window | null = null) => {
     if (!event) return;
-    const checkInUrl = `${window.location.origin}/events/${event.id}/check-in`;
+    const checkInUrl = `${window.location.origin}/events/${event.id}/check-in?gate=${encodeURIComponent(
+      assignedStaff.gateToken || ''
+    )}`;
     const subject = `Gate access assigned: ${event.name}`;
     const body = `Hi ${assignedStaff.user.name},\n\nYou have been assigned as gate staff for ${event.name}.\n\nEvent date: ${new Date(
       event.startDateTime
@@ -606,7 +615,11 @@ export const EventDetailPage: React.FC = () => {
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
       assignedStaff.user.email
     )}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+    if (targetWindow) {
+      targetWindow.location.href = gmailUrl;
+    } else {
+      window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+    }
   };
 
   // Remove Staff
@@ -1847,7 +1860,7 @@ export const EventDetailPage: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 text-xs font-semibold bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 rounded-xl hover:opacity-90"
                 >
-                  Assign to Event
+                  Assign &amp; Open Gmail
                 </button>
               </div>
             </form>
