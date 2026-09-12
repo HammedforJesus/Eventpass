@@ -600,6 +600,21 @@ export const EventDetailPage: React.FC = () => {
     }
   };
 
+  const openEmailComposer = (to: string, subject: string, body: string, targetWindow: Window | null = null) => {
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(
+      subject
+    )}&body=${encodeURIComponent(body)}`;
+    const mailtoUrl = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const composerWindow = targetWindow || window.open(gmailUrl, '_blank');
+
+    if (composerWindow) {
+      composerWindow.location.href = gmailUrl;
+      return;
+    }
+
+    window.location.href = mailtoUrl;
+  };
+
   const openStaffGmail = (assignedStaff: EventStaffItem, targetWindow: Window | null = null) => {
     if (!event) return;
     const checkInUrl = `${window.location.origin}/events/${event.id}/check-in?gate=${encodeURIComponent(
@@ -612,14 +627,7 @@ export const EventDetailPage: React.FC = () => {
       hour: '2-digit',
       minute: '2-digit',
     })}\nVenue: ${event.venue}, ${event.address}\n\nOpen the gate scanner here:\n${checkInUrl}\n\nSign in with your assigned EventPass account before scanning guest QR codes or six-digit gate codes.\n\nThank you.`;
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
-      assignedStaff.user.email
-    )}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    if (targetWindow) {
-      targetWindow.location.href = gmailUrl;
-    } else {
-      window.open(gmailUrl, '_blank', 'noopener,noreferrer');
-    }
+    openEmailComposer(assignedStaff.user.email, subject, body, targetWindow);
   };
 
   // Remove Staff
