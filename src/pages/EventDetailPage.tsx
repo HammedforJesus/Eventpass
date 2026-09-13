@@ -117,6 +117,13 @@ export const EventDetailPage: React.FC = () => {
   const [emailPreviewUrl, setEmailPreviewUrl] = useState<string | null>(null);
   const [batchSending, setBatchSending] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState(false);
+  const [showManualEmailModal, setShowManualEmailModal] = useState(false);
+  const [manualStaffEmail, setManualStaffEmail] = useState<{
+    to: string;
+    subject: string;
+    body: string;
+  } | null>(null);
+  const [copiedStaffMessage, setCopiedStaffMessage] = useState(false);
 
   // Add Staff Form
   const [newStaff, setNewStaff] = useState({ email: '', name: '' });
@@ -577,7 +584,6 @@ export const EventDetailPage: React.FC = () => {
   const handleAssignStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventId) return;
-    const gmailWindow = window.open('', '_blank');
 
     try {
       const res = await api.events.assignStaff(eventId, newStaff);
@@ -586,36 +592,17 @@ export const EventDetailPage: React.FC = () => {
         setNewStaff({ email: '', name: '' });
         loadStaff();
         if (res.data) {
-          openStaffGmail(res.data, gmailWindow);
-        } else {
-          gmailWindow?.close();
+          setManualStaffEmail(getStaffEmailDetails(res.data));
         }
       } else {
-        gmailWindow?.close();
         alert(res.error?.message || 'Failed to assign staff');
       }
     } catch (err: any) {
-      gmailWindow?.close();
       alert(err.message);
     }
   };
 
-  const openEmailComposer = (to: string, subject: string, body: string, targetWindow: Window | null = null) => {
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(
-      subject
-    )}&body=${encodeURIComponent(body)}`;
-    const mailtoUrl = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    const composerWindow = targetWindow || window.open(gmailUrl, '_blank');
-
-    if (composerWindow) {
-      composerWindow.location.href = gmailUrl;
-      return;
-    }
-
-    window.location.href = mailtoUrl;
-  };
-
-  const openStaffGmail = (assignedStaff: EventStaffItem, targetWindow: Window | null = null) => {
+  const getStaffEmailDetails = (assignedStaff: EventStaffItem) => {
     if (!event) return;
     const checkInUrl = `${window.location.origin}/events/${event.id}/check-in?gate=${encodeURIComponent(
       assignedStaff.gateToken || ''
@@ -627,7 +614,19 @@ export const EventDetailPage: React.FC = () => {
       hour: '2-digit',
       minute: '2-digit',
     })}\nVenue: ${event.venue}, ${event.address}\n\nOpen the gate scanner here:\n${checkInUrl}\n\nSign in with your assigned EventPass account before scanning guest QR codes or six-digit gate codes.\n\nThank you.`;
-    openEmailComposer(assignedStaff.user.email, subject, body, targetWindow);
+    return { to: assignedStaff.user.email, subject, body };
+  };
+
+  const getGuestEmailDetails = (guest: GuestItem, invitation: any) => {
+    const passUrl = `${window.location.origin}/invite/${invitation.token}`;
+    const subject = `Your Invitation: ${event?.name || 'Event'}`;
+    const body = `Hi ${guest.name},\n\nYou are invited to ${event?.name || 'our event'}!\n\nDate: ${event ? new Date(
+      event.startDateTime
+    ).toLocaleDateString() : ''} at ${event ? new Date(event.startDateTime).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    }) : ''}\nVenue: ${event?.venue || ''}, ${event?.address || ''}\n\nAccess your digital event pass and gate QR code here:\n${passUrl}\n\nPlease click the link to confirm your RSVP and save your pass to your mobile device.\n\nSee you there!`;
+    return { subject, body };
   };
 
   // Remove Staff
@@ -1476,8 +1475,11 @@ export const EventDetailPage: React.FC = () => {
                       <td className="p-3.5 text-right">
                         <button
                           type="button"
-                          title="Email gate access through Gmail"
-                          onClick={() => openStaffGmail(s)}
+                          title="Copy gate access message"
+                          onClick={() => {
+                            const staffEmail = getStaffEmailDetails(s);
+                            if (staffEmail) setManualStaffEmail(staffEmail);
+                          }}
                           className="p-1.5 mr-1 text-zinc-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30 transition cursor-pointer"
                         >
                           <Mail className="w-3.5 h-3.5" />
@@ -1868,10 +1870,86 @@ export const EventDetailPage: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 text-xs font-semibold bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 rounded-xl hover:opacity-90"
                 >
-                  Assign &amp; Open Gmail
+                  Assign &amp; Copy Message
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {manualStaffEmail && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden text-zinc-800 dark:text-zinc-200">
+            <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-sm">Staff Access Message Ready</h3>
+                <p className="text-xs text-zinc-500 mt-1">Copy and paste this into your own email or message app.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManualStaffEmail(null)}
+                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer"
+                title="Close"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50 dark:bg-blue-950/30 text-xs text-blue-800 dark:text-blue-200">
+                <strong>Next step:</strong> Copy the details below, open your individual email or messaging app, and send them to the staff member.
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">To</label>
+                <input
+                  readOnly
+                  value={manualStaffEmail.to}
+                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Subject</label>
+                <input
+                  readOnly
+                  value={manualStaffEmail.subject}
+                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Message</label>
+                <textarea
+                  readOnly
+                  value={manualStaffEmail.body}
+                  rows={10}
+                  className="mt-1 w-full px-3 py-2 text-sm leading-6 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 resize-y"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setManualStaffEmail(null)}
+                className="px-3 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(
+                    `To: ${manualStaffEmail.to}\nSubject: ${manualStaffEmail.subject}\n\n${manualStaffEmail.body}`
+                  );
+                  setCopiedStaffMessage(true);
+                  setTimeout(() => setCopiedStaffMessage(false), 2500);
+                }}
+                className="px-3 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1.5 cursor-pointer"
+              >
+                {copiedStaffMessage ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedStaffMessage ? 'Copied' : 'Copy All Details'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2058,77 +2136,24 @@ export const EventDetailPage: React.FC = () => {
               </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* 1. Gmail Web 1-click */}
-                {(() => {
-                  const passUrl = `${window.location.origin}/invite/${selectedGuestForInvite.invitation.token}`;
-                  const subject = `Your Invitation: ${event.name}`;
-                  const body = `Hi ${selectedGuestForInvite.guest.name},\n\nYou are invited to ${event.name}!\n\n📅 Date: ${new Date(
-                    event.startDateTime
-                  ).toLocaleDateString()} at ${new Date(event.startDateTime).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}\n📍 Venue: ${event.venue}, ${event.address}\n\nAccess your digital event pass and gate QR code here:\n${passUrl}\n\nPlease click the link to confirm your RSVP and save your pass to your mobile device.\n\nSee you there!`;
-                  const gmailWebUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
-                    selectedGuestForInvite.guest.email
-                  )}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-
-                  return (
-                    <a
-                      href={gmailWebUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => handleMarkAsSent(selectedGuestForInvite.invitation.id, 'GMAIL_WEB')}
-                      className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-rose-400 dark:hover:border-rose-600 bg-zinc-50 dark:bg-zinc-950 flex items-center gap-3 transition group"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                        <Mail className="w-4 h-4" />
-                      </div>
-                      <div className="text-left flex-1 min-w-0">
-                        <p className="text-xs font-bold text-zinc-900 dark:text-white group-hover:text-rose-600 transition">
-                          Gmail Web
-                        </p>
-                        <p className="text-[11px] text-zinc-500 truncate">
-                          Opens in browser Gmail
-                        </p>
-                      </div>
-                    </a>
-                  );
-                })()}
-
-                {/* 2. Default Email Client */}
-                {(() => {
-                  const passUrl = `${window.location.origin}/invite/${selectedGuestForInvite.invitation.token}`;
-                  const subject = `Your Invitation: ${event.name}`;
-                  const body = `Hi ${selectedGuestForInvite.guest.name},\n\nYou are invited to ${event.name}!\n\n📅 Date: ${new Date(
-                    event.startDateTime
-                  ).toLocaleDateString()} at ${new Date(event.startDateTime).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}\n📍 Venue: ${event.venue}, ${event.address}\n\nAccess your digital event pass and gate QR code here:\n${passUrl}\n\nPlease click the link to confirm your RSVP and save your pass to your mobile device.\n\nSee you there!`;
-                  const mailtoUrl = `mailto:${encodeURIComponent(
-                    selectedGuestForInvite.guest.email
-                  )}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-
-                  return (
-                    <a
-                      href={mailtoUrl}
-                      onClick={() => handleMarkAsSent(selectedGuestForInvite.invitation.id, 'MAILTO')}
-                      className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 bg-zinc-50 dark:bg-zinc-950 flex items-center gap-3 transition group"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                        <Mail className="w-4 h-4" />
-                      </div>
-                      <div className="text-left flex-1 min-w-0">
-                        <p className="text-xs font-bold text-zinc-900 dark:text-white group-hover:text-blue-600 transition">
-                          Default Email App
-                        </p>
-                        <p className="text-[11px] text-zinc-500 truncate">
-                          Apple Mail, Outlook, etc.
-                        </p>
-                      </div>
-                    </a>
-                  );
-                })()}
+                {/* 1. Copy email details for manual sending */}
+                <button
+                  type="button"
+                  onClick={() => setShowManualEmailModal(true)}
+                  className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-blue-400 dark:hover:border-blue-600 bg-zinc-50 dark:bg-zinc-950 flex items-center gap-3 transition group cursor-pointer text-left"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                    <Copy className="w-4 h-4" />
+                  </div>
+                  <div className="text-left flex-1 min-w-0">
+                    <p className="text-xs font-bold text-zinc-900 dark:text-white group-hover:text-blue-600 transition">
+                      Copy Email Details
+                    </p>
+                    <p className="text-[11px] text-zinc-500 truncate">
+                      Copy, then send manually
+                    </p>
+                  </div>
+                </button>
 
                 {/* 3. WhatsApp */}
                 {(() => {
