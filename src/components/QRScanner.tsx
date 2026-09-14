@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { Camera, CameraOff, RefreshCw, AlertCircle } from 'lucide-react';
+import { Camera, CameraOff, ScanLine } from 'lucide-react';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -128,43 +128,62 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   }, [isPaused]);
 
   return (
-    <div className="relative w-full max-w-sm mx-auto overflow-hidden rounded-2xl bg-zinc-950 border border-zinc-800 shadow-xl">
+    <div className="relative w-full max-w-md mx-auto overflow-hidden rounded-3xl bg-zinc-950 border border-zinc-800 shadow-2xl">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
+            <ScanLine className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-white">Scan guest QR code</p>
+            <p className="text-[10px] text-zinc-500">Keep the pass inside the frame</p>
+          </div>
+        </div>
+        <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${
+          isScanning ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-800 text-zinc-500'
+        }`}>
+          {isScanning ? 'Ready' : 'Starting'}
+        </span>
+      </div>
+
       {/* Viewfinder Target Container */}
-      <div id={containerId} className="w-full aspect-square" />
+      <div className="relative aspect-square bg-zinc-950">
+        <div id={containerId} className="h-full w-full" />
 
-      {/* Laser Scanning Animation Overlay */}
-      {isScanning && !isPaused && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="relative w-64 h-64 border-2 border-emerald-500/60 rounded-2xl">
+        {/* Laser Scanning Animation Overlay */}
+        {isScanning && !isPaused && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="relative h-[min(72vw,16rem)] w-[min(72vw,16rem)] max-h-[75%] max-w-[75%] rounded-2xl border-2 border-emerald-500/60">
             {/* Corner Markers */}
-            <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl" />
-            <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr" />
-            <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-emerald-400 rounded-bl" />
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-emerald-400 rounded-br" />
+              <div className="absolute -left-1 -top-1 h-7 w-7 rounded-tl border-l-4 border-t-4 border-emerald-400" />
+              <div className="absolute -right-1 -top-1 h-7 w-7 rounded-tr border-r-4 border-t-4 border-emerald-400" />
+              <div className="absolute -bottom-1 -left-1 h-7 w-7 rounded-bl border-b-4 border-l-4 border-emerald-400" />
+              <div className="absolute -bottom-1 -right-1 h-7 w-7 rounded-br border-b-4 border-r-4 border-emerald-400" />
 
-            {/* Pulsing Scan Beam */}
-            <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#34d399] animate-[bounce_2s_infinite]" />
+              {/* Pulsing Scan Beam */}
+              <div className="absolute left-2 right-2 top-1/2 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#34d399] animate-[pulse_2s_infinite]" />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Error or Camera Unavailable State */}
-      {hasPermission === false && (
-        <div className="absolute inset-0 bg-zinc-950 flex flex-col items-center justify-center p-6 text-center text-zinc-300 space-y-3">
-          <div className="p-3 bg-zinc-900 rounded-full text-amber-400">
-            <CameraOff className="w-8 h-8" />
+        {/* Error or Camera Unavailable State */}
+        {hasPermission === false && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3 bg-zinc-950 p-6 text-center text-zinc-300">
+            <div className="rounded-2xl bg-zinc-900 p-3 text-amber-400">
+              <CameraOff className="h-8 w-8" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-semibold text-white">Camera unavailable</h4>
+              <p className="max-w-xs text-xs text-zinc-400">{errorMessage}</p>
+            </div>
           </div>
-          <div className="space-y-1">
-            <h4 className="font-semibold text-white text-sm">Camera Unavailable</h4>
-            <p className="text-xs text-zinc-400 max-w-xs">{errorMessage}</p>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Footer status text */}
-      <div className="p-2.5 bg-zinc-900/90 text-center text-[11px] text-zinc-400 font-mono flex items-center justify-center gap-1.5 border-t border-zinc-800">
-        <Camera className="w-3.5 h-3.5 text-emerald-400" />
-        <span>Align QR code inside frame</span>
+      <div className="flex items-center justify-center gap-2 border-t border-zinc-800 bg-zinc-900 px-3 py-3 text-center text-[11px] text-zinc-400">
+        <Camera className="h-3.5 w-3.5 text-emerald-400" />
+        <span>{isPaused ? 'Scanner paused while verifying' : 'Align all four corners inside the frame'}</span>
       </div>
     </div>
   );

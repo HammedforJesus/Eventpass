@@ -2056,6 +2056,7 @@ export const EventDetailPage: React.FC = () => {
               </div>
               <QRCodeDisplay
                 token={selectedGuestForInvite.invitation.token}
+                verificationCode={selectedGuestForInvite.invitation.rawVerificationCode}
                 guestName={selectedGuestForInvite.guest.name}
                 eventName={event.name}
                 size={150}
