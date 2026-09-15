@@ -498,6 +498,7 @@ router.get('/:id/guests', requireEventAccess, async (req: AuthenticatedRequest, 
           select: {
             id: true,
             token: true,
+            encryptedCode: true,
             status: true,
             rsvpStatus: true,
             expiresAt: true,
@@ -516,7 +517,19 @@ router.get('/:id/guests', requireEventAccess, async (req: AuthenticatedRequest, 
       orderBy: { createdAt: 'desc' },
     });
 
-    return res.json({ success: true, data: guests });
+    const guestsWithCodes = guests.map((guest) => ({
+      ...guest,
+      invitation: guest.invitation
+        ? {
+            ...guest.invitation,
+            rawVerificationCode: guest.invitation.encryptedCode
+              ? decryptCode(guest.invitation.encryptedCode)
+              : undefined,
+          }
+        : guest.invitation,
+    }));
+
+    return res.json({ success: true, data: guestsWithCodes });
   } catch (err: any) {
     return res.status(500).json({
       success: false,

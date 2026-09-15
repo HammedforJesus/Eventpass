@@ -620,12 +620,13 @@ export const EventDetailPage: React.FC = () => {
   const getGuestEmailDetails = (guest: GuestItem, invitation: any) => {
     const passUrl = `${window.location.origin}/invite/${invitation.token}`;
     const subject = `Your Invitation: ${event?.name || 'Event'}`;
+    const verificationCode = invitation.rawVerificationCode || 'shown on your invitation page';
     const body = `Hi ${guest.name},\n\nYou are invited to ${event?.name || 'our event'}!\n\nDate: ${event ? new Date(
       event.startDateTime
     ).toLocaleDateString() : ''} at ${event ? new Date(event.startDateTime).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
-    }) : ''}\nVenue: ${event?.venue || ''}, ${event?.address || ''}\n\nAccess your digital event pass and gate QR code here:\n${passUrl}\n\nPlease click the link to confirm your RSVP and save your pass to your mobile device.\n\nSee you there!`;
+    }) : ''}\nVenue: ${event?.venue || ''}, ${event?.address || ''}\n\nAccess your digital event pass and gate QR code here:\n${passUrl}\n\nBackup 6-digit entry code: ${verificationCode}\n\nPlease click the link to confirm your RSVP and save your pass to your mobile device.\n\nSee you there!`;
     return { subject, body };
   };
 
@@ -2159,9 +2160,10 @@ export const EventDetailPage: React.FC = () => {
                 {/* 3. WhatsApp */}
                 {(() => {
                   const passUrl = `${window.location.origin}/invite/${selectedGuestForInvite.invitation.token}`;
+                  const verificationCode = selectedGuestForInvite.invitation.rawVerificationCode || 'shown on your invitation page';
                   const text = `Hi ${selectedGuestForInvite.guest.name}! Here is your invitation and gate pass for *${event.name}*:\n\n📅 ${new Date(
                     event.startDateTime
-                  ).toLocaleDateString()}\n📍 ${event.venue}\n\n👉 Access your pass: ${passUrl}`;
+                  ).toLocaleDateString()}\n📍 ${event.venue}\n\n👉 Access your pass: ${passUrl}\n\nBackup 6-digit entry code: ${verificationCode}`;
                   const phone = selectedGuestForInvite.guest.phone?.replace(/[^\d]/g, '');
                   const whatsappUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : null;
 
@@ -2201,7 +2203,8 @@ export const EventDetailPage: React.FC = () => {
                 {selectedGuestForInvite.guest.phone ? (
                   (() => {
                     const passUrl = `${window.location.origin}/invite/${selectedGuestForInvite.invitation.token}`;
-                    const text = `Hi ${selectedGuestForInvite.guest.name}, your pass for ${event.name} is ready: ${passUrl}`;
+                    const verificationCode = selectedGuestForInvite.invitation.rawVerificationCode || 'shown on your invitation page';
+                    const text = `Hi ${selectedGuestForInvite.guest.name}, your pass for ${event.name} is ready: ${passUrl}. Backup 6-digit entry code: ${verificationCode}`;
                     const smsUrl = `sms:${selectedGuestForInvite.guest.phone}?body=${encodeURIComponent(text)}`;
 
                     return (

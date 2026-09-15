@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma, checkDatabaseConnection } from '../db.js';
-import { hashToken } from '../utils/crypto.js';
+import { decryptCode, encryptCode, generate6DigitCode, hashCode, hashToken } from '../utils/crypto.js';
 import { logAudit } from '../utils/audit.js';
 
 const router = Router();
@@ -121,12 +121,27 @@ router.get('/:token', async (req: Request, res: Response) => {
       invitation.status = 'VIEWED';
     }
 
+    let rawVerificationCode: string | undefined;
+    if (invitation.encryptedCode) {
+      rawVerificationCode = decryptCode(invitation.encryptedCode);
+    } else {
+      rawVerificationCode = generate6DigitCode();
+      await prisma.invitation.update({
+        where: { id: invitation.id },
+        data: {
+          verificationCodeHash: await hashCode(rawVerificationCode),
+          encryptedCode: encryptCode(rawVerificationCode),
+        },
+      });
+    }
+
     // Return safe guest payload
     return res.json({
       success: true,
       data: {
         id: invitation.id,
         token: invitation.token,
+        rawVerificationCode,
         status: invitation.status,
         rsvpStatus: invitation.rsvpStatus,
         rsvpAt: invitation.rsvpAt,

@@ -215,7 +215,12 @@ export const GuestInvitePage: React.FC = () => {
 
           {/* QR Code Pass */}
           <div className="pt-2 text-center space-y-2">
-            <QRCodeDisplay token={invitation.token} guestName={guest.name} eventName={event.name} />
+            <QRCodeDisplay
+              token={invitation.token}
+              verificationCode={invitation.rawVerificationCode}
+              guestName={guest.name}
+              eventName={event.name}
+            />
             <p className="text-[11px] text-zinc-400">
               Present this QR code on arrival for instant admission.
             </p>
