@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   UserCheck,
   LogIn,
+  Upload,
 } from 'lucide-react';
 
 export const EventCreatePage: React.FC = () => {
@@ -45,6 +46,26 @@ export const EventCreatePage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloggingIn, setReloggingIn] = useState(false);
+
+  const handleBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file for the banner.');
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setError('Banner images must be 4 MB or smaller.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setBannerUrl(reader.result);
+    };
+    reader.onerror = () => setError('Could not read that image. Please try another file.');
+    reader.readAsDataURL(file);
+  };
 
   const handleQuickLoginOrganizer = async () => {
     setReloggingIn(true);
@@ -336,7 +357,7 @@ export const EventCreatePage: React.FC = () => {
 
         {/* Banner URL */}
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Banner Image URL</label>
+          <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Banner Image</label>
           <div className="relative">
             <ImageIcon className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3.5" />
             <input
@@ -346,6 +367,14 @@ export const EventCreatePage: React.FC = () => {
               placeholder="https://images.unsplash.com/..."
               className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
             />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] text-zinc-400">Paste an image URL or choose an image from your device (max 4 MB).</p>
+            <label className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer transition">
+              <Upload className="w-3.5 h-3.5" />
+              Choose Image
+              <input type="file" accept="image/*" onChange={handleBannerFileChange} className="sr-only" />
+            </label>
           </div>
           {bannerUrl && (
             <div className="mt-2 h-28 w-full rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800">

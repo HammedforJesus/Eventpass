@@ -79,6 +79,7 @@ model Invitation {
   token                String           @unique
   tokenHash            String           @unique
   verificationCodeHash String
+  encryptedCode        String?
   status               String           @default("PENDING")
   rsvpStatus           String           @default("PENDING")
   rsvpAt               DateTime?

@@ -2,6 +2,14 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
 const SALT_ROUNDS = 10;
+const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
+
+function getEncryptionKey(): Buffer {
+  return crypto
+    .createHash('sha256')
+    .update(process.env.JWT_SECRET || 'eventpass-jwt-secret-dev-2026-secure-key')
+    .digest();
+}
 
 /**
  * Generate a cryptographically secure random invitation token (opaque string)
@@ -30,6 +38,26 @@ export function generate6DigitCode(): string {
  */
 export async function hashCode(code: string): Promise<string> {
   return bcrypt.hash(code.trim(), SALT_ROUNDS);
+}
+
+export function encryptCode(code: string): string {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, getEncryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(code.trim(), 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return [iv.toString('base64url'), authTag.toString('base64url'), encrypted.toString('base64url')].join('.');
+}
+
+export function decryptCode(value: string): string {
+  const [ivValue, authTagValue, encryptedValue] = value.split('.');
+  if (!ivValue || !authTagValue || !encryptedValue) throw new Error('Invalid encrypted verification code.');
+  const decipher = crypto.createDecipheriv(
+    ENCRYPTION_ALGORITHM,
+    getEncryptionKey(),
+    Buffer.from(ivValue, 'base64url')
+  );
+  decipher.setAuthTag(Buffer.from(authTagValue, 'base64url'));
+  return Buffer.concat([decipher.update(Buffer.from(encryptedValue, 'base64url')), decipher.final()]).toString('utf8');
 }
 
 /**

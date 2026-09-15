@@ -11,6 +11,8 @@ import {
   hashToken,
   generate6DigitCode,
   hashCode,
+  encryptCode,
+  decryptCode,
   hashPassword,
 } from '../utils/crypto.js';
 import { logAudit } from '../utils/audit.js';
@@ -587,6 +589,7 @@ router.post('/:id/guests', async (req: AuthenticatedRequest, res: Response) => {
           token,
           tokenHash,
           verificationCodeHash,
+          encryptedCode: encryptCode(code),
           status: 'PENDING',
           rsvpStatus: 'PENDING',
           expiresAt,
@@ -724,6 +727,7 @@ router.post('/:id/guests/import', async (req: AuthenticatedRequest, res: Respons
             token,
             tokenHash,
             verificationCodeHash,
+            encryptedCode: encryptCode(code),
             status: 'PENDING',
             rsvpStatus: 'PENDING',
             expiresAt,
@@ -902,6 +906,7 @@ router.post(
           token: newToken,
           tokenHash: newTokenHash,
           verificationCodeHash: newCodeHash,
+          encryptedCode: encryptCode(newCode),
           status: 'PENDING',
           revokedAt: null,
         },
@@ -972,6 +977,17 @@ router.post(
 
       if (normalizedChannel === 'EMAIL') {
         try {
+          let verificationCode = invitation.encryptedCode ? decryptCode(invitation.encryptedCode) : null;
+          if (!verificationCode) {
+            verificationCode = generate6DigitCode();
+            await prisma.invitation.update({
+              where: { id: invitationId },
+              data: {
+                verificationCodeHash: await hashCode(verificationCode),
+                encryptedCode: encryptCode(verificationCode),
+              },
+            });
+          }
           emailDelivery = await sendInvitationEmail({
             eventId,
             eventName: event.name,
@@ -986,6 +1002,7 @@ router.post(
             guestCategory: invitation.guest.category,
             plusOne: invitation.guest.plusOne,
             passUrl,
+            verificationCode,
           });
         } catch (mailErr: any) {
           console.warn('sendInvitationEmail failed:', mailErr);
@@ -1083,6 +1100,17 @@ router.post(
       for (const inv of pendingInvitations) {
         try {
           const passUrl = `${baseUrl}/invite/${inv.token}`;
+          let verificationCode = inv.encryptedCode ? decryptCode(inv.encryptedCode) : null;
+          if (!verificationCode) {
+            verificationCode = generate6DigitCode();
+            await prisma.invitation.update({
+              where: { id: inv.id },
+              data: {
+                verificationCodeHash: await hashCode(verificationCode),
+                encryptedCode: encryptCode(verificationCode),
+              },
+            });
+          }
           const delivery = await sendInvitationEmail({
             eventId,
             eventName: event.name,
@@ -1097,6 +1125,7 @@ router.post(
             guestCategory: inv.guest.category,
             plusOne: inv.guest.plusOne,
             passUrl,
+            verificationCode,
           });
 
           if (!delivery.success) {

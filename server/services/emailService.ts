@@ -301,6 +301,8 @@ export function buildInvitationHtml(payload: InvitationEmailPayload): string {
 
               ${payload.qrCodeDataUrl ? `<div style="text-align: center; margin: 0 0 24px 0;"><img src="cid:eventpass-qr" alt="Unique QR code for ${payload.eventName}" width="220" height="220" style="display: inline-block; background: #ffffff; padding: 12px; border-radius: 12px;"></div>` : ''}
 
+              ${payload.verificationCode ? `<div style="text-align: center; margin: 0 0 24px 0; padding: 16px; background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px;"><div style="font-size: 11px; color: #047857; text-transform: uppercase; font-weight: 700; letter-spacing: 0.08em;">Backup 6-digit entry code</div><div style="font-size: 28px; color: #064e3b; font-weight: 800; letter-spacing: 0.2em; font-family: monospace; margin-top: 6px;">${payload.verificationCode}</div><div style="font-size: 11px; color: #065f46; margin-top: 6px;">Use this code if the QR code cannot be scanned.</div></div>` : ''}
+
               <!-- Security Notice -->
               <div style="background-color: rgba(39, 39, 42, 0.5); border: 1px dashed #3f3f46; border-radius: 8px; padding: 12px 16px; font-size: 12px; color: #a1a1aa; line-height: 1.5;">
                 🔒 <strong>Entry Instruction:</strong> When you arrive at the gate, staff will scan your digital QR pass. Please keep this email accessible or save the pass to your home screen.
@@ -351,6 +353,10 @@ ACCESS YOUR DIGITAL PASS & GATE QR CODE:
 ${payload.passUrl}
 
 Please open this link to confirm your RSVP and view your QR code for rapid check-in at the gate.
+${payload.verificationCode ? `
+BACKUP 6-DIGIT ENTRY CODE:
+${payload.verificationCode}
+Use this code at the gate if the QR code cannot be scanned.` : ''}
 
 See you at the event!
 Powered by EVENTPASS
