@@ -30,6 +30,10 @@ import { createGateAccessToken } from '../middleware/auth.js';
 const router = Router();
 
 function getBaseUrl(req: AuthenticatedRequest): string {
+  // Invitation links must point to the public app, not the API or an admin preview host.
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
+  if (process.env.CLIENT_URL) return process.env.CLIENT_URL.replace(/\/$/, '');
+
   const origin = req.get('origin');
   if (origin && origin !== 'null') return origin;
   const referer = req.get('referer');
@@ -39,8 +43,6 @@ function getBaseUrl(req: AuthenticatedRequest): string {
       return url.origin;
     } catch {}
   }
-  if (process.env.APP_URL) return process.env.APP_URL;
-  if (process.env.CLIENT_URL) return process.env.CLIENT_URL;
   const host = req.get('host');
   const protocol = req.protocol || 'http';
   return `${protocol}://${host}`;

@@ -227,11 +227,11 @@ export const OrganizerDashboard: React.FC = () => {
                 >
                   {/* Event Banner Image or Placeholder */}
                   {ev.bannerUrl ? (
-                    <div className="h-32 w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800 relative">
+                    <div className="aspect-[16/7] w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800 relative">
                       <img
                         src={ev.bannerUrl}
                         alt={ev.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                       />
                       <div className="absolute top-2.5 right-2.5">{getStatusBadge(ev.status)}</div>
                     </div>

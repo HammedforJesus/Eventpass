@@ -711,8 +711,8 @@ export const EventDetailPage: React.FC = () => {
       {/* Event Header Banner */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
         {event.bannerUrl && (
-          <div className="h-44 w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-            <img src={event.bannerUrl} alt={event.name} className="w-full h-full object-cover" />
+          <div className="aspect-[16/6] w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+            <img src={event.bannerUrl} alt={event.name} className="w-full h-full object-contain" />
           </div>
         )}
 

@@ -377,8 +377,8 @@ export const EventCreatePage: React.FC = () => {
             </label>
           </div>
           {bannerUrl && (
-            <div className="mt-2 h-28 w-full rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
-              <img src={bannerUrl} alt="Banner Preview" className="w-full h-full object-cover" />
+            <div className="mt-2 aspect-[16/7] w-full rounded-xl overflow-hidden border border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950">
+              <img src={bannerUrl} alt="Banner Preview" className="w-full h-full object-contain" />
             </div>
           )}
         </div>

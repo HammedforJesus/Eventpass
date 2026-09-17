@@ -114,6 +114,8 @@ export const GuestInvitePage: React.FC = () => {
                 ? 'Invitation Revoked'
                 : error?.code === 'INVITATION_EXPIRED'
                 ? 'Invitation Expired'
+                : error?.code === 'DATABASE_DISCONNECTED' || error?.code === 'SERVER_ERROR'
+                ? 'Pass Temporarily Unavailable'
                 : 'Invitation Not Found'}
             </h2>
             <p className="text-xs text-zinc-500">{error?.message || 'This invitation link is invalid.'}</p>
@@ -138,8 +140,8 @@ export const GuestInvitePage: React.FC = () => {
       <div className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden space-y-0">
         {/* Banner image or graphic header */}
         {event.bannerUrl ? (
-          <div className="h-36 w-full overflow-hidden relative">
-            <img src={event.bannerUrl} alt={event.name} className="w-full h-full object-cover" />
+          <div className="aspect-[16/7] w-full overflow-hidden relative bg-zinc-100 dark:bg-zinc-950">
+            <img src={event.bannerUrl} alt={event.name} className="w-full h-full object-contain" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
             <div className="absolute bottom-3 left-4 right-4 text-white">
               <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-sm">
