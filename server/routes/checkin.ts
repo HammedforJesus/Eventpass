@@ -38,7 +38,17 @@ router.get('/event/:id', requireEventAccess, async (req: AuthenticatedRequest, r
   if (!event) {
     return res.status(404).json({ success: false, error: { code: 'EVENT_NOT_FOUND', message: 'The requested event does not exist.' } });
   }
-  return res.json({ success: true, data: event });
+  const checkedInAttendees = await prisma.checkIn.aggregate({
+    where: { eventId: event.id },
+    _sum: { attendeeCount: true },
+  });
+  return res.json({
+    success: true,
+    data: {
+      ...event,
+      checkedInAttendees: checkedInAttendees._sum.attendeeCount || 0,
+    },
+  });
 });
 
 /**
@@ -47,11 +57,12 @@ router.get('/event/:id', requireEventAccess, async (req: AuthenticatedRequest, r
 async function getLiveEventStats(eventId: string, capacity: number) {
   const [totalInvited, checkedIn] = await Promise.all([
     prisma.invitation.count({ where: { eventId } }),
-    prisma.checkIn.count({ where: { eventId } }),
+    prisma.checkIn.aggregate({ where: { eventId }, _sum: { attendeeCount: true } }),
   ]);
-  const remaining = Math.max(0, capacity - checkedIn);
-  const attendanceRate = totalInvited > 0 ? Math.round((checkedIn / totalInvited) * 100) : 0;
-  return { totalInvited, checkedIn, remaining, attendanceRate, capacity };
+  const checkedInCount = checkedIn._sum.attendeeCount || 0;
+  const remaining = Math.max(0, capacity - checkedInCount);
+  const attendanceRate = totalInvited > 0 ? Math.round((checkedInCount / totalInvited) * 100) : 0;
+  return { totalInvited, checkedIn: checkedInCount, remaining, attendanceRate, capacity };
 }
 
 /**
@@ -171,8 +182,10 @@ router.post('/qr', requireEventAccess, async (req: AuthenticatedRequest, res: Re
       });
     }
 
-    // 6. Check duplicate check-in
-    if (invitation.checkIn) {
+    const allowedAttendees = 1 + invitation.guest.plusOne;
+
+    // 6. Check whether all attendees on this pass have already checked in
+    if (invitation.checkIn && invitation.checkIn.attendeeCount >= allowedAttendees) {
       const formattedTime = new Date(invitation.checkIn.checkedInAt).toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
@@ -182,12 +195,14 @@ router.post('/qr', requireEventAccess, async (req: AuthenticatedRequest, res: Re
         success: false,
         error: {
           code: 'ALREADY_CHECKED_IN',
-          message: `Already Checked In at ${formattedTime}${
+          message: `All ${allowedAttendees} attendee${allowedAttendees === 1 ? '' : 's'} already checked in at ${formattedTime}${
             invitation.checkIn.staffUser?.name ? ` by ${invitation.checkIn.staffUser.name}` : ''
           }.`,
           guest: {
             name: invitation.guest.name,
             category: invitation.guest.category,
+            plusOne: invitation.guest.plusOne,
+            attendeeCount: invitation.checkIn.attendeeCount,
             checkedInAt: invitation.checkIn.checkedInAt,
           },
         },
@@ -197,7 +212,11 @@ router.post('/qr', requireEventAccess, async (req: AuthenticatedRequest, res: Re
     // 7. Atomic transaction with capacity check & duplicate check-in protection
     const checkInResult = await prisma.$transaction(async (tx) => {
       // Re-verify capacity inside transaction
-      const currentAttendance = await tx.checkIn.count({ where: { eventId } });
+      const currentAttendanceResult = await tx.checkIn.aggregate({
+        where: { eventId },
+        _sum: { attendeeCount: true },
+      });
+      const currentAttendance = currentAttendanceResult._sum.attendeeCount || 0;
       if (currentAttendance >= event.capacity) {
         throw new Error('EVENT_CAPACITY_REACHED');
       }
@@ -208,7 +227,7 @@ router.post('/qr', requireEventAccess, async (req: AuthenticatedRequest, res: Re
           OR: [{ invitationId: invitation.id }, { guestId: invitation.guestId }],
         },
       });
-      if (existingCheckIn) {
+      if (existingCheckIn && existingCheckIn.attendeeCount >= allowedAttendees) {
         throw new Error('ALREADY_CHECKED_IN');
       }
 
@@ -226,14 +245,20 @@ router.post('/qr', requireEventAccess, async (req: AuthenticatedRequest, res: Re
         }
       }
 
-      const checkIn = await tx.checkIn.create({
-        data: {
-          eventId,
-          guestId: invitation.guestId,
-          invitationId: invitation.id,
-          checkedInBy: validStaffId,
-        },
-      });
+      const checkIn = existingCheckIn
+        ? await tx.checkIn.update({
+            where: { id: existingCheckIn.id },
+            data: { attendeeCount: { increment: 1 }, checkedInBy: validStaffId },
+          })
+        : await tx.checkIn.create({
+            data: {
+              eventId,
+              guestId: invitation.guestId,
+              invitationId: invitation.id,
+              checkedInBy: validStaffId,
+              attendeeCount: 1,
+            },
+          });
 
       await tx.invitation.update({
         where: { id: invitation.id },
@@ -283,6 +308,8 @@ router.post('/qr', requireEventAccess, async (req: AuthenticatedRequest, res: Re
           id: checkInResult.id,
           checkedInAt: checkInResult.checkedInAt,
           checkedInBy: req.user!.name,
+          attendeeCount: checkInResult.attendeeCount,
+          allowedAttendees,
         },
         stats,
       },
@@ -403,8 +430,10 @@ router.post(
         });
       }
 
-      // 5. Check duplicate check-in
-      if (matchedInvitation.checkIn) {
+      const allowedAttendees = 1 + matchedInvitation.guest.plusOne;
+
+      // 5. Check whether all attendees on this pass have already checked in
+      if (matchedInvitation.checkIn && matchedInvitation.checkIn.attendeeCount >= allowedAttendees) {
         const formattedTime = new Date(matchedInvitation.checkIn.checkedInAt).toLocaleTimeString([], {
           hour: '2-digit',
           minute: '2-digit',
@@ -414,7 +443,7 @@ router.post(
           success: false,
           error: {
             code: 'ALREADY_CHECKED_IN',
-            message: `Already Checked In at ${formattedTime}${
+            message: `All ${allowedAttendees} attendee${allowedAttendees === 1 ? '' : 's'} already checked in at ${formattedTime}${
               matchedInvitation.checkIn.staffUser?.name
                 ? ` by ${matchedInvitation.checkIn.staffUser.name}`
                 : ''
@@ -422,6 +451,8 @@ router.post(
             guest: {
               name: matchedInvitation.guest.name,
               category: matchedInvitation.guest.category,
+              plusOne: matchedInvitation.guest.plusOne,
+              attendeeCount: matchedInvitation.checkIn.attendeeCount,
               checkedInAt: matchedInvitation.checkIn.checkedInAt,
             },
           },
@@ -430,7 +461,11 @@ router.post(
 
       // 6. Perform atomic check-in
       const checkInResult = await prisma.$transaction(async (tx) => {
-        const currentAttendance = await tx.checkIn.count({ where: { eventId } });
+        const currentAttendanceResult = await tx.checkIn.aggregate({
+          where: { eventId },
+          _sum: { attendeeCount: true },
+        });
+        const currentAttendance = currentAttendanceResult._sum.attendeeCount || 0;
         if (currentAttendance >= event.capacity) {
           throw new Error('EVENT_CAPACITY_REACHED');
         }
@@ -440,7 +475,7 @@ router.post(
             OR: [{ invitationId: matchedInvitation.id }, { guestId: matchedInvitation.guestId }],
           },
         });
-        if (existingCheckIn) {
+        if (existingCheckIn && existingCheckIn.attendeeCount >= allowedAttendees) {
           throw new Error('ALREADY_CHECKED_IN');
         }
 
@@ -457,14 +492,20 @@ router.post(
           }
         }
 
-        const checkIn = await tx.checkIn.create({
-          data: {
-            eventId,
-            guestId: matchedInvitation.guestId,
-            invitationId: matchedInvitation.id,
-            checkedInBy: validStaffId,
-          },
-        });
+        const checkIn = existingCheckIn
+          ? await tx.checkIn.update({
+              where: { id: existingCheckIn.id },
+              data: { attendeeCount: { increment: 1 }, checkedInBy: validStaffId },
+            })
+          : await tx.checkIn.create({
+              data: {
+                eventId,
+                guestId: matchedInvitation.guestId,
+                invitationId: matchedInvitation.id,
+                checkedInBy: validStaffId,
+                attendeeCount: 1,
+              },
+            });
 
         await tx.invitation.update({
           where: { id: matchedInvitation.id },
@@ -513,6 +554,8 @@ router.post(
             id: checkInResult.id,
             checkedInAt: checkInResult.checkedInAt,
             checkedInBy: req.user!.name,
+            attendeeCount: checkInResult.attendeeCount,
+            allowedAttendees,
           },
           stats,
         },

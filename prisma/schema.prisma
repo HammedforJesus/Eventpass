@@ -118,6 +118,7 @@ model CheckIn {
   eventId      String
   guestId      String     @unique
   invitationId String     @unique
+  attendeeCount Int        @default(1)
   checkedInBy  String
   checkedInAt  DateTime   @default(now())
 

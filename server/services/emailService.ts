@@ -305,7 +305,7 @@ export function buildInvitationHtml(payload: InvitationEmailPayload): string {
 
               <!-- Security Notice -->
               <div style="background-color: rgba(39, 39, 42, 0.5); border: 1px dashed #3f3f46; border-radius: 8px; padding: 12px 16px; font-size: 12px; color: #a1a1aa; line-height: 1.5;">
-                🔒 <strong>Entry Instruction:</strong> When you arrive at the gate, staff will scan your digital QR pass. Please keep this email accessible or save the pass to your home screen.
+                🔒 <strong>Entry Instruction:</strong> Staff will scan your digital QR pass once for each person. ${payload.plusOne ? `This pass admits ${1 + payload.plusOne} people, so share the QR code with the remaining ${payload.plusOne} guest${payload.plusOne === 1 ? '' : 's'}.` : 'Please keep this email accessible or save the pass to your home screen.'}
               </div>
             </td>
           </tr>
@@ -353,6 +353,7 @@ ACCESS YOUR DIGITAL PASS & GATE QR CODE:
 ${payload.passUrl}
 
 Please open this link to confirm your RSVP and view your QR code for rapid check-in at the gate.
+${payload.plusOne ? `This pass admits ${1 + payload.plusOne} people. Share the QR code with the remaining ${payload.plusOne} guest${payload.plusOne === 1 ? '' : 's'}; staff will scan it once for each person.` : ''}
 ${payload.verificationCode ? `
 BACKUP 6-DIGIT ENTRY CODE:
 ${payload.verificationCode}

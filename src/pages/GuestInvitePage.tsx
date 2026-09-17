@@ -193,8 +193,9 @@ export const GuestInvitePage: React.FC = () => {
               </span>
             </div>
             {guest.plusOne > 0 && (
-              <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                Includes admittance for you + {guest.plusOne} guest
+              <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium space-y-1">
+                <div>Includes admittance for you + {guest.plusOne} guest{guest.plusOne === 1 ? '' : 's'} (total {1 + guest.plusOne} people)</div>
+                <div>Share this QR code with the remaining {guest.plusOne} guest{guest.plusOne === 1 ? '' : 's'} so each person can be scanned at the entrance.</div>
               </div>
             )}
           </div>
@@ -222,7 +223,9 @@ export const GuestInvitePage: React.FC = () => {
               eventName={event.name}
             />
             <p className="text-[11px] text-zinc-400">
-              Present this QR code on arrival for instant admission.
+              {guest.plusOne > 0
+                ? `This QR code must be scanned ${1 + guest.plusOne} times, once for each person. Share it with the remaining ${guest.plusOne} guest${guest.plusOne === 1 ? '' : 's'}.`
+                : 'Present this QR code on arrival for instant admission.'}
             </p>
           </div>
 

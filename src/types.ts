@@ -45,6 +45,7 @@ export interface EventItem {
   bannerUrl: string | null;
   createdAt: string;
   updatedAt: string;
+  checkedInAttendees?: number;
   _count?: {
     guests: number;
     invitations: number;
@@ -84,6 +85,8 @@ export interface InvitationItem {
   rawVerificationCode?: string;
   isCheckedIn?: boolean;
   checkedInAt?: string | null;
+  checkedInCount?: number;
+  allowedAttendees?: number;
   guest: {
     id?: string;
     name: string;
@@ -127,6 +130,7 @@ export interface CheckInItem {
   invitationId: string;
   checkedInBy: string;
   checkedInAt: string;
+  attendeeCount?: number;
   guest?: {
     name: string;
     category: GuestCategory;

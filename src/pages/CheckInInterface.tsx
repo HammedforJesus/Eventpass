@@ -47,6 +47,7 @@ export const CheckInInterface: React.FC = () => {
       name: string;
       category: string;
       plusOne?: number;
+      attendeeCount?: number;
       checkedInAt?: string;
     };
     checkedInBy?: string;
@@ -125,7 +126,7 @@ export const CheckInInterface: React.FC = () => {
     eventRequest.then((res) => {
       if (res.success && res.data) {
         setCurrentEvent(res.data);
-        const checked = res.data._count?.checkIns || 0;
+        const checked = res.data.checkedInAttendees ?? res.data._count?.checkIns ?? 0;
         const cap = res.data.capacity;
         const total = res.data._count?.guests || 0;
         setLiveStats({
@@ -447,7 +448,7 @@ export const CheckInInterface: React.FC = () => {
                 <div className="text-lg font-bold text-white">{verificationResult.guest.name}</div>
                 {verificationResult.guest.plusOne !== undefined && verificationResult.guest.plusOne > 0 && (
                   <div className="text-xs text-emerald-300">
-                    + {verificationResult.guest.plusOne} Additional Guest Allowed
+                    Scanned {verificationResult.guest.attendeeCount || 1} of {1 + verificationResult.guest.plusOne} people on this pass
                   </div>
                 )}
               </div>

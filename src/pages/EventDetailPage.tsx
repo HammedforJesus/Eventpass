@@ -2063,7 +2063,9 @@ export const EventDetailPage: React.FC = () => {
                 size={150}
               />
               <p className="text-[11px] text-zinc-500">
-                This QR code is unique to {selectedGuestForInvite.guest.name} for this event.
+                {selectedGuestForInvite.guest.plusOne > 0
+                  ? `Scan this QR code ${1 + selectedGuestForInvite.guest.plusOne} times, once for each person. Share it with the remaining ${selectedGuestForInvite.guest.plusOne} guest${selectedGuestForInvite.guest.plusOne === 1 ? '' : 's'}.`
+                  : `This QR code is unique to ${selectedGuestForInvite.guest.name} for this event.`}
               </p>
             </div>
 

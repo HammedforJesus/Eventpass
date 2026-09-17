@@ -65,6 +65,7 @@ router.get('/:token', async (req: Request, res: Response) => {
         checkIn: {
           select: {
             checkedInAt: true,
+            attendeeCount: true,
           },
         },
       },
@@ -146,8 +147,10 @@ router.get('/:token', async (req: Request, res: Response) => {
         rsvpStatus: invitation.rsvpStatus,
         rsvpAt: invitation.rsvpAt,
         expiresAt: invitation.expiresAt,
-        isCheckedIn: Boolean(invitation.checkIn),
+        isCheckedIn: Boolean(invitation.checkIn && invitation.checkIn.attendeeCount >= 1 + invitation.guest.plusOne),
         checkedInAt: invitation.checkIn?.checkedInAt || null,
+        checkedInCount: invitation.checkIn?.attendeeCount || 0,
+        allowedAttendees: 1 + invitation.guest.plusOne,
         guest: invitation.guest,
         event: invitation.event,
       },
