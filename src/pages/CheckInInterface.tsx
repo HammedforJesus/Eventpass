@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -68,7 +68,6 @@ export const CheckInInterface: React.FC = () => {
 
   const [recentScans, setRecentScans] = useState<any[]>([]);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const autoResetTimer = useRef<any>(null);
 
   // Simple Audio Synthesizer for Audio Feedback (Success chime / Error buzz)
   const playFeedbackSound = (type: 'success' | 'error' | 'warning') => {
@@ -157,26 +156,10 @@ export const CheckInInterface: React.FC = () => {
     };
   }, [selectedEventId, isGateAccess, gateToken]);
 
-  // Clean auto-reset timer on unmount
-  useEffect(() => {
-    return () => {
-      if (autoResetTimer.current) clearTimeout(autoResetTimer.current);
-    };
-  }, []);
-
   const resetVerification = () => {
-    if (autoResetTimer.current) clearTimeout(autoResetTimer.current);
     setVerificationResult(null);
     setManualCode('');
     setIsProcessing(false);
-  };
-
-  // Schedule auto-reset after successful scan
-  const scheduleAutoReset = () => {
-    if (autoResetTimer.current) clearTimeout(autoResetTimer.current);
-    autoResetTimer.current = setTimeout(() => {
-      resetVerification();
-    }, 4500);
   };
 
   // Process QR Token Scan
@@ -201,7 +184,7 @@ export const CheckInInterface: React.FC = () => {
           status: 'SUCCESS',
           title: 'CHECK-IN SUCCESSFUL',
           message: 'Guest pass verified. Access granted.',
-          guest: res.data.guest,
+          guest: { ...res.data.guest, attendeeCount: res.data.checkIn.attendeeCount },
           checkedInBy: res.data.checkIn.checkedInBy,
         });
         if (res.data.stats) {
@@ -211,7 +194,6 @@ export const CheckInInterface: React.FC = () => {
             remaining: res.data.stats.remaining,
           }));
         }
-        scheduleAutoReset();
       } else {
         if (res.error?.code === 'ALREADY_CHECKED_IN') {
           playFeedbackSound('error');
@@ -265,7 +247,7 @@ export const CheckInInterface: React.FC = () => {
           status: 'SUCCESS',
           title: 'CHECK-IN SUCCESSFUL',
           message: '6-digit code verified. Access granted.',
-          guest: res.data.guest,
+          guest: { ...res.data.guest, attendeeCount: res.data.checkIn.attendeeCount },
           checkedInBy: res.data.checkIn.checkedInBy,
         });
         if (res.data.stats) {
@@ -275,7 +257,6 @@ export const CheckInInterface: React.FC = () => {
             remaining: res.data.stats.remaining,
           }));
         }
-        scheduleAutoReset();
       } else {
         if (res.error?.code === 'ALREADY_CHECKED_IN') {
           playFeedbackSound('error');
@@ -320,10 +301,9 @@ export const CheckInInterface: React.FC = () => {
                 status: 'SUCCESS',
                 title: 'CHECK-IN SUCCESSFUL',
                 message: '6-digit code verified.',
-                guest: res.data.guest,
+                guest: { ...res.data.guest, attendeeCount: res.data.checkIn.attendeeCount },
                 checkedInBy: res.data.checkIn.checkedInBy,
               });
-              scheduleAutoReset();
             } else {
               playFeedbackSound('error');
               setVerificationResult({
@@ -461,7 +441,7 @@ export const CheckInInterface: React.FC = () => {
                 className="px-6 py-3 rounded-xl bg-white text-zinc-950 font-bold text-sm hover:opacity-90 transition shadow-md flex items-center gap-2 cursor-pointer"
               >
                 <RotateCcw className="w-4 h-4" />
-                <span>Next Scan (or Auto-Reset)</span>
+                <span>Next Scan</span>
               </button>
             </div>
           </div>

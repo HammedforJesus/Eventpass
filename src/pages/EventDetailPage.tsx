@@ -11,6 +11,7 @@ import {
   AuditLogItem,
   SentEmailRecord,
   EmailConfigStatus,
+  getEventDisplayStatus,
 } from '../types';
 import {
   Calendar,
@@ -724,7 +725,7 @@ export const EventDetailPage: React.FC = () => {
                   {event.name}
                 </h1>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                  {event.status}
+                  {getEventDisplayStatus(event)}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500">

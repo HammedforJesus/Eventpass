@@ -54,6 +54,20 @@ export interface EventItem {
   };
 }
 
+export type EventDisplayStatus = EventStatus | 'D-DAY' | 'DONE';
+
+export function getEventDisplayStatus(event: Pick<EventItem, 'status' | 'startDateTime'>): EventDisplayStatus {
+  if (event.status === 'DRAFT' || event.status === 'CANCELLED') return event.status;
+
+  const today = new Date();
+  const eventDate = new Date(event.startDateTime);
+  const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+  const eventDateKey = `${eventDate.getFullYear()}-${eventDate.getMonth()}-${eventDate.getDate()}`;
+
+  if (eventDateKey === todayKey) return 'D-DAY';
+  return eventDate > today ? 'UPCOMING' : 'DONE';
+}
+
 export interface GuestItem {
   id: string;
   eventId: string;
@@ -184,6 +198,8 @@ export interface CheckInResponseData {
     id: string;
     checkedInAt: string;
     checkedInBy: string;
+    attendeeCount: number;
+    allowedAttendees: number;
   };
   stats: {
     totalInvited: number;

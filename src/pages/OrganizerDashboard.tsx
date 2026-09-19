@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
-import { EventItem } from '../types';
+import { EventItem, getEventDisplayStatus } from '../types';
 import {
   Calendar,
   PlusCircle,
@@ -63,7 +63,10 @@ export const OrganizerDashboard: React.FC = () => {
 
   // Compute aggregate stats across events
   const totalEvents = events.length;
-  const upcomingEvents = events.filter((e) => e.status === 'UPCOMING' || e.status === 'ACTIVE').length;
+  const upcomingEvents = events.filter((e) => {
+    const displayStatus = getEventDisplayStatus(e);
+    return displayStatus === 'UPCOMING' || displayStatus === 'D-DAY';
+  }).length;
   const totalGuests = events.reduce((acc, e) => acc + (e._count?.guests || 0), 0);
   const totalCheckedIn = events.reduce((acc, e) => acc + (e._count?.checkIns || 0), 0);
   const aggregateAttendanceRate =
@@ -81,6 +84,18 @@ export const OrganizerDashboard: React.FC = () => {
         return (
           <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300">
             Upcoming
+          </span>
+        );
+      case 'D-DAY':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
+            D-day
+          </span>
+        );
+      case 'DONE':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+            Done
           </span>
         );
       case 'COMPLETED':
@@ -233,11 +248,11 @@ export const OrganizerDashboard: React.FC = () => {
                         alt={ev.name}
                         className="w-full h-full object-contain"
                       />
-                      <div className="absolute top-2.5 right-2.5">{getStatusBadge(ev.status)}</div>
+                      <div className="absolute top-2.5 right-2.5">{getStatusBadge(getEventDisplayStatus(ev))}</div>
                     </div>
                   ) : (
                     <div className="h-24 w-full bg-gradient-to-r from-zinc-100 to-zinc-200 dark:from-zinc-900 dark:to-zinc-800 p-3 flex justify-end items-start">
-                      {getStatusBadge(ev.status)}
+                      {getStatusBadge(getEventDisplayStatus(ev))}
                     </div>
                   )}
 
