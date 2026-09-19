@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -68,6 +68,7 @@ export const CheckInInterface: React.FC = () => {
 
   const [recentScans, setRecentScans] = useState<any[]>([]);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const scanCycleLocked = useRef(false);
 
   // Simple Audio Synthesizer for Audio Feedback (Success chime / Error buzz)
   const playFeedbackSound = (type: 'success' | 'error' | 'warning') => {
@@ -157,6 +158,7 @@ export const CheckInInterface: React.FC = () => {
   }, [selectedEventId, isGateAccess, gateToken]);
 
   const resetVerification = () => {
+    scanCycleLocked.current = false;
     setVerificationResult(null);
     setManualCode('');
     setIsProcessing(false);
@@ -164,7 +166,8 @@ export const CheckInInterface: React.FC = () => {
 
   // Process QR Token Scan
   const handleQRScan = async (scannedText: string) => {
-    if (isProcessing || verificationResult) return;
+    if (scanCycleLocked.current || isProcessing || verificationResult) return;
+    scanCycleLocked.current = true;
     if (!selectedEventId) {
       setVerificationResult({
         status: 'ERROR',

@@ -20,6 +20,10 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const containerId = 'eventpass-qr-reader';
   const lastScannedText = useRef<string | null>(null);
   const lastScannedTime = useRef<number>(0);
+  const onScanSuccessRef = useRef(onScanSuccess);
+  const requiresClearFrame = useRef(false);
+
+  onScanSuccessRef.current = onScanSuccess;
 
   useEffect(() => {
     let mounted = true;
@@ -44,17 +48,20 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         // Scan frame handlers
         const onFrameSuccess = (decodedText: string) => {
           const now = Date.now();
+          if (requiresClearFrame.current) return;
           // Throttle consecutive duplicate scans (1.5s debounce)
           if (decodedText === lastScannedText.current && now - lastScannedTime.current < 1500) {
             return;
           }
           lastScannedText.current = decodedText;
           lastScannedTime.current = now;
-          onScanSuccess(decodedText);
+          requiresClearFrame.current = true;
+          onScanSuccessRef.current(decodedText);
         };
 
         const onFrameError = (err: any) => {
           // benign frame decode failure
+          requiresClearFrame.current = false;
           if (onScanError) onScanError(err);
         };
 
@@ -111,7 +118,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         }
       }
     };
-  }, [onScanSuccess]);
+  }, []);
 
   // Handle pause/resume
   useEffect(() => {
