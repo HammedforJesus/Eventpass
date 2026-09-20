@@ -1665,7 +1665,7 @@ export const EventDetailPage: React.FC = () => {
                 />
               </div>
 
-              <div className="space-y-1">
+              {/* <div className="space-y-1">
                 <label className="text-xs font-semibold">Email Address (optional)</label>
                 <input
                   type="email"
@@ -1675,7 +1675,7 @@ export const EventDetailPage: React.FC = () => {
                   placeholder="elena@company.com"
                   className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 focus:outline-none"
                 />
-              </div>
+              </div> */}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
