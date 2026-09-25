@@ -547,10 +547,10 @@ router.post('/:id/guests', async (req: AuthenticatedRequest, res: Response) => {
   const eventId = req.params.id;
   const { name, email, phone, category, plusOne, notes } = req.body;
 
-  if (!name || !email) {
+  if (!name) {
     return res.status(400).json({
       success: false,
-      error: { code: 'MISSING_FIELDS', message: 'Guest name and email are required.' },
+      error: { code: 'MISSING_FIELDS', message: 'Guest name is required.' },
     });
   }
 
@@ -564,9 +564,10 @@ router.post('/:id/guests', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Check duplicate email in this event
-    const existingGuest = await prisma.guest.findFirst({
-      where: { eventId, email: email.toLowerCase().trim() },
-    });
+    const normalizedEmail = typeof email === 'string' && email.trim() ? email.toLowerCase().trim() : null;
+    const existingGuest = normalizedEmail
+      ? await prisma.guest.findFirst({ where: { eventId, email: normalizedEmail } })
+      : null;
 
     if (existingGuest) {
       return res.status(409).json({
@@ -589,7 +590,7 @@ router.post('/:id/guests', async (req: AuthenticatedRequest, res: Response) => {
         data: {
           eventId,
           name: name.trim(),
-          email: email.toLowerCase().trim(),
+          email: normalizedEmail,
           phone: phone?.trim() || null,
           category: category || 'REGULAR',
           plusOne: parseInt(plusOne, 10) || 0,
@@ -675,9 +676,8 @@ router.post('/:id/guests/import', async (req: AuthenticatedRequest, res: Respons
     }
 
     const existingEmails = new Set(
-      (await prisma.guest.findMany({ where: { eventId }, select: { email: true } })).map((g) =>
-        g.email.toLowerCase()
-      )
+      (await prisma.guest.findMany({ where: { eventId }, select: { email: true } }))
+        .flatMap((guest) => guest.email ? [guest.email.toLowerCase()] : [])
     );
 
     const validRows: any[] = [];
@@ -985,6 +985,13 @@ router.post(
 
       const normalizedChannel = String(channel).toUpperCase();
       let updatedStatus = invitation.status;
+
+      if (normalizedChannel === 'EMAIL' && !invitation.guest.email) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_EMAIL', message: 'This guest has no email address. Share the invitation link or QR pass instead.' },
+        });
+      }
 
       const baseUrl = getBaseUrl(req);
       const passUrl = `${baseUrl}/invite/${invitation.token}`;

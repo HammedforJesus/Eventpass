@@ -99,7 +99,6 @@ export const EventDetailPage: React.FC = () => {
   // Add Guest Form
   const [newGuest, setNewGuest] = useState({
     name: '',
-    email: '',
     phone: '',
     category: 'REGULAR',
     plusOne: 0,
@@ -382,7 +381,7 @@ export const EventDetailPage: React.FC = () => {
       if (res.success && res.data) {
         setShowAddGuestModal(false);
         const addedGuest = res.data;
-        setNewGuest({ name: '', email: '', phone: '', category: 'REGULAR', plusOne: 0, notes: '' });
+        setNewGuest({ name: '', phone: '', category: 'REGULAR', plusOne: 0, notes: '' });
         loadGuests();
         loadEvent();
         loadAnalytics();
@@ -658,7 +657,7 @@ export const EventDetailPage: React.FC = () => {
   const filteredGuests = guests.filter((g) => {
     const matchesSearch =
       g.name.toLowerCase().includes(guestSearch.toLowerCase()) ||
-      g.email.toLowerCase().includes(guestSearch.toLowerCase());
+      (g.email || '').toLowerCase().includes(guestSearch.toLowerCase());
 
     const matchesCategory = categoryFilter === 'ALL' || g.category === categoryFilter;
 
@@ -965,7 +964,7 @@ export const EventDetailPage: React.FC = () => {
                         <tr key={g.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40">
                           <td className="p-3.5">
                             <div className="font-semibold text-zinc-900 dark:text-white">{g.name}</div>
-                            <div className="text-[11px] text-zinc-400 font-mono">{g.email}</div>
+                            {g.email && <div className="text-[11px] text-zinc-400 font-mono">{g.email}</div>}
                           </td>
                           <td className="p-3.5">
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
@@ -1665,18 +1664,6 @@ export const EventDetailPage: React.FC = () => {
                 />
               </div>
 
-              {/* <div className="space-y-1">
-                <label className="text-xs font-semibold">Email Address (optional)</label>
-                <input
-                  type="email"
-                  // required
-                  value={newGuest.email}
-                  onChange={(e) => setNewGuest({ ...newGuest, email: e.target.value })}
-                  placeholder="elena@company.com"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 focus:outline-none"
-                />
-              </div> */}
-
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold">Category</label>
@@ -2001,7 +1988,9 @@ export const EventDetailPage: React.FC = () => {
               <div className="flex items-center justify-between text-xs">
                 <span className="text-zinc-500">Recipient:</span>
                 <span className="font-semibold text-zinc-900 dark:text-white">
-                  {selectedGuestForInvite.guest.name} &lt;{selectedGuestForInvite.guest.email}&gt;
+                  {selectedGuestForInvite.guest.email
+                    ? `${selectedGuestForInvite.guest.name} <${selectedGuestForInvite.guest.email}>`
+                    : selectedGuestForInvite.guest.name}
                 </span>
               </div>
               {selectedGuestForInvite.guest.phone && (
@@ -2092,11 +2081,9 @@ export const EventDetailPage: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-500">
-                  Sends the formatted digital pass with gate QR code to{' '}
-                  <strong className="text-zinc-700 dark:text-zinc-300 font-mono">
-                    {selectedGuestForInvite.guest.email}
-                  </strong>
-                  .{' '}
+                  {selectedGuestForInvite.guest.email
+                    ? <>Sends the formatted digital pass with gate QR code to <strong className="text-zinc-700 dark:text-zinc-300 font-mono">{selectedGuestForInvite.guest.email}</strong>. </>
+                    : 'This guest has no email address. Share their pass link or QR code instead. '}
                   {emailConfig?.configured
                       ? emailConfig.provider === 'RESEND'
                         ? 'This uses your configured Resend account.'
@@ -2106,7 +2093,7 @@ export const EventDetailPage: React.FC = () => {
                 <div className="flex items-center gap-2 pt-1">
                   <button
                     type="button"
-                    disabled={sendingInvite}
+                    disabled={sendingInvite || !selectedGuestForInvite.guest.email}
                     onClick={() => handleMarkAsSent(selectedGuestForInvite.invitation.id, 'EMAIL')}
                     className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
                   >
@@ -2115,7 +2102,7 @@ export const EventDetailPage: React.FC = () => {
                   </button>
 
                   {/* Check if already in sent emails */}
-                  {(() => {
+                  {selectedGuestForInvite.guest.email && (() => {
                     const existing = sentEmails.find(
                       (m) => m.recipientEmail.toLowerCase() === selectedGuestForInvite.guest.email.toLowerCase()
                     );
@@ -2142,7 +2129,7 @@ export const EventDetailPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {/* 1. Copy email details for manual sending */}
-                <button
+                {selectedGuestForInvite.guest.email && <button
                   type="button"
                   onClick={() => setShowManualEmailModal(true)}
                   className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-blue-400 dark:hover:border-blue-600 bg-zinc-50 dark:bg-zinc-950 flex items-center gap-3 transition group cursor-pointer text-left"
@@ -2158,7 +2145,7 @@ export const EventDetailPage: React.FC = () => {
                       Copy, then send manually
                     </p>
                   </div>
-                </button>
+                </button>}
 
                 {/* 3. WhatsApp */}
                 {(() => {

@@ -72,7 +72,7 @@ export interface GuestItem {
   id: string;
   eventId: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   category: GuestCategory;
   plusOne: number;

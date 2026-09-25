@@ -56,7 +56,7 @@ model Guest {
   id         String        @id @default(uuid())
   eventId    String
   name       String
-  email      String
+  email      String?
   phone      String?
   category   String        @default("REGULAR")
   plusOne    Int           @default(0)
