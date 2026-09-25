@@ -104,7 +104,7 @@ export interface InvitationItem {
   guest: {
     id?: string;
     name: string;
-    email: string;
+    email: string | null;
     category: GuestCategory;
     phone?: string | null;
     plusOne?: number;

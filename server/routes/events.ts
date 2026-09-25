@@ -1120,6 +1120,8 @@ router.post(
       let sentCount = 0;
 
       for (const inv of pendingInvitations) {
+        if (!inv.guest.email) continue;
+
         try {
           const passUrl = `${baseUrl}/invite/${inv.token}`;
           let verificationCode = inv.encryptedCode ? decryptCode(inv.encryptedCode) : null;
